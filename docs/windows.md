@@ -9,15 +9,17 @@ Esta guía instala WebDM en una PC con Windows 10 u 11 para desarrollar y probar
 | Programa | Dónde | Al instalar |
 | --- | --- | --- |
 | **Python 3.13** | https://www.python.org/downloads/windows/ | Marca **"Add python.exe to PATH"** en la primera pantalla. |
-| **PostgreSQL 16** | https://www.postgresql.org/download/windows/ (instalador de EDB) | Anota la contraseña que te pide para el usuario `postgres`. Puerto 5432. Stack Builder no hace falta. |
+| **PostgreSQL** (16 o más nuevo, por ejemplo 18) | https://www.postgresql.org/download/windows/ (instalador de EDB) | Anota la contraseña que te pide para el usuario `postgres`. Puerto 5432. Stack Builder no hace falta. |
 | **Git** | https://git-scm.com/download/win | Deja las opciones por omisión. |
+
+> En esta guía las rutas dicen `PostgreSQL\18`. Si instalaste otra versión, cambia el `18` por la tuya (por ejemplo `16`); el servicio se llama igual, `postgresql-x64-16`.
 
 Cierra y vuelve a abrir PowerShell, y comprueba:
 
 ```powershell
 py --version        # Python 3.13.x
 git --version
-& "C:\Program Files\PostgreSQL\16\bin\psql.exe" --version
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" --version
 ```
 
 - `py` es el lanzador de Python para Windows. Si tienes varias versiones, `py -3.13` elige esa.
@@ -26,7 +28,7 @@ git --version
 ## 2. Crear la base de datos y su usuario
 
 ```powershell
-& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres
 ```
 
 Te pide la contraseña de `postgres` del paso 1. Dentro escribe:
@@ -96,6 +98,8 @@ En el Bloc de notas:
 - Pon la contraseña del paso 2 en `DB_PASSWORD=`.
 - Lo demás se queda igual. Guarda y cierra.
 
+Escribe la contraseña **sin comillas ni espacios** (`DB_PASSWORD=Webdm2026`). Evita el símbolo `#`: en `.env` lo que sigue a un `#` puede tomarse como comentario y la contraseña queda cortada.
+
 `.env` guarda los datos que cambian de una máquina a otra. El código es el mismo en Windows y en Ubuntu; solo cambia este archivo.
 
 ## 6. Crear las tablas, datos de prueba y arrancar
@@ -143,7 +147,7 @@ No copias la carpeta de Windows. En el servidor:
 2. Si quieres llevarte los **datos** que capturaste en Windows (no solo el código), los exportas con PostgreSQL:
 
    ```powershell
-   & "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe" -U webdm -Fc -f webdm.dump webdm
+   & "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe" -U webdm -Fc -f webdm.dump webdm
    ```
 
    Pasas `webdm.dump` al servidor y ahí lo cargas sobre la base vacía con
@@ -156,8 +160,35 @@ El despliegue definitivo (Gunicorn, Nginx, servicio de systemd) es la fase 5.
 | Mensaje | Causa y solución |
 | --- | --- |
 | `'py' no se reconoce…` | Python no quedó en el PATH. Reinstala marcando "Add python.exe to PATH". |
-| `password authentication failed for user "webdm"` | `DB_PASSWORD` en `.env` no coincide con la del paso 2. |
-| `connection refused … port 5432` | El servicio de PostgreSQL no está corriendo: Inicio, "Servicios", busca `postgresql-x64-16` e inícialo. |
+| `password authentication failed for user "webdm"` | `DB_PASSWORD` en `.env` no coincide con la del paso 2. Revisa comillas, espacios o `#`, o vuelve a empezar con la sección "Empezar de cero". |
+| `psql` no muestra lo que escribo en la contraseña | Es normal: no muestra ni asteriscos. Escríbela y da Enter. |
+| `connection refused … port 5432` | El servicio de PostgreSQL no está corriendo: Inicio, "Servicios", busca `postgresql-x64-18` e inícialo. |
 | `UnicodeDecodeError` al conectar | Suele ser un error de contraseña que PostgreSQL reporta en español con otra codificación. Revisa usuario y contraseña del `.env`. |
 | `Falta la variable de entorno DJANGO_SECRET_KEY` | No existe `.env` en la carpeta del proyecto, o le falta la clave. |
 | La página se ve sin estilos | Bootstrap se carga de internet; revisa tu conexión. |
+
+## Empezar de cero con la base
+
+**Si falla la contraseña de `webdm`:** entra como `postgres` y vuelve a crear todo:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres
+```
+
+```sql
+DROP DATABASE IF EXISTS webdm;   -- borra la base y todas sus tablas
+DROP ROLE IF EXISTS webdm;       -- borra el usuario (solo se puede cuando ya no es dueño de ninguna base)
+CREATE ROLE webdm LOGIN PASSWORD 'Webdm2026' CREATEDB;
+CREATE DATABASE webdm OWNER webdm ENCODING 'UTF8' TEMPLATE template0;
+\q
+```
+
+Pon la misma contraseña en `.env` y corre otra vez `python manage.py migrate` y `python manage.py datos_demo`.
+
+**Si olvidaste la contraseña de `postgres`:**
+
+1. PowerShell **como administrador**: `notepad "C:\Program Files\PostgreSQL\18\data\pg_hba.conf"`.
+2. En las líneas de `127.0.0.1/32` y `::1/128` cambia `scram-sha-256` por `trust` y guarda. `pg_hba.conf` es la lista de quién puede entrar y cómo; `trust` deja entrar sin contraseña desde esta PC.
+3. `Restart-Service postgresql-x64-18` para que PostgreSQL relea el archivo.
+4. `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -h 127.0.0.1` y dentro `ALTER USER postgres PASSWORD 'nueva-contraseña';`.
+5. Regresa `trust` a `scram-sha-256`, guarda y reinicia el servicio otra vez. **Nunca lo dejes en `trust`.**
