@@ -49,3 +49,14 @@ body { background: #F5F6F8; color: #1F2328; }
 .wd-bandeja .wd-codigo { width: 100px; }
 .wd-contador { margin-left: 6px; padding: 0 7px; border-radius: 9px; background: #1D4ED8; color: #fff; font-size: 12px; font-weight: 600; }
 .wd-usuario a.wd-cuenta { font-size: 12px; color: #57606A; }
+
+/* --- Ficha de una partida ------------------------------------------------- */
+.wd-ficha { background: #fff; border: 1px solid #D8DCE1; border-radius: 8px; padding: 20px; }
+.wd-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px 18px; }
+.wd-campo.ancho { grid-column: span 2; }
+@media (max-width: 480px) { .wd-campo.ancho { grid-column: auto; } }
+.wd-campo .form-label { display: block; font-size: 12px; font-weight: 600; color: #57606A; margin-bottom: 4px; }
+.wd-valor { padding: 6px 10px; border: 1px solid #EAEEF2; border-radius: 6px; min-height: 36px; }
+.wd-valor.auto { background: #F6F8FA; color: #57606A; }
+.wd-imagenes { display: flex; flex-wrap: wrap; gap: 12px; }
+.wd-imagen-vacia { width: 140px; height: 105px; border: 1px dashed #C4CAD1; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #8C959F; font-size: 13px; }

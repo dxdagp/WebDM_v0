@@ -133,3 +133,69 @@ class CorreccionTests(TestCase):
         self.client.force_login(self.val)
         r = self.client.get(reverse("solicitudes:corregir", args=[solicitud.pk]))
         self.assertRedirects(r, reverse("solicitudes:detalle", args=[solicitud.pk]))
+
+
+class FichaPartidaTests(TestCase):
+    """La ficha tipo formulario de UNA partida, que se abre desde Pendientes de mi atención."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.c = crear_catalogos()
+        cls.sol = crear_usuario("sol", "SOL_MAT", centros=[cls.c["mttu"]])
+        cls.val = crear_usuario("val", "VAL_MAT", centros=[cls.c["mttu"]])
+        cls.dm = crear_usuario("dm", "DM", centros=[cls.c["mttu"]])
+        cls.val_meix = crear_usuario("valmeix", "VAL_MAT", centros=[cls.c["meix"]])
+
+    def setUp(self):
+        self.solicitud = crear_enviada(self.c, self.sol, n=2)
+        self.p1, self.p2 = self.solicitud.partidas.order_by("numero")
+        self.url = reverse("solicitudes:partida", args=[self.p1.pk])
+
+    def datos(self, accion, **cambios):
+        a = self.p1.alta
+        datos = {
+            "accion": accion, "pid": self.p1.pk, "centro": self.p1.centro_id, "descripcion": a.descripcion,
+            "ubicacion": a.ubicacion_id, "no_parte_original": a.no_parte_original, "tipo_unidad": a.tipo_unidad,
+            "marca": a.marca, "version": a.version, "anio_modelo": a.anio_modelo, "compatibilidad": "",
+            "umb": a.umb_id, "grupo_articulos": a.grupo_articulos_id,
+            "categoria_valoracion": a.categoria_valoracion_id, "grupo_compras": a.grupo_compras_id,
+        }
+        datos.update(cambios)
+        return datos
+
+    def test_la_bandeja_enlaza_a_la_ficha(self):
+        self.client.force_login(self.val)
+        r = self.client.get(reverse("solicitudes:pendientes"))
+        self.assertContains(r, self.url)
+
+    def test_muestra_solo_esa_partida_y_sus_acciones(self):
+        self.client.force_login(self.val)
+        r = self.client.get(self.url)
+        self.assertContains(r, "FILTRO 0")
+        self.assertNotContains(r, "FILTRO 1")
+        self.assertContains(r, 'value="aprobar"')
+        self.assertContains(r, 'value="devolver"')
+        self.assertContains(r, "Imagen 1")
+
+    def test_validador_corrige_y_aprueba_desde_la_ficha(self):
+        self.client.force_login(self.val)
+        r = self.client.post(self.url, self.datos("aprobar", marca="Marca nueva"))
+        self.assertRedirects(r, reverse("solicitudes:pendientes") + "?tab=val", fetch_redirect_response=False)
+        self.p1.refresh_from_db()
+        self.assertEqual(self.p1.estado, E.EN_DM)
+        self.assertEqual(self.p1.alta.marca, "MARCA NUEVA")
+        self.assertEqual(self.p2.estado, E.EN_VALIDACION)  # la otra partida no se toca
+
+    def test_dm_termina_desde_la_ficha(self):
+        Partida.objects.filter(pk=self.p1.pk).update(estado=E.EN_DM)
+        self.client.force_login(self.dm)
+        r = self.client.get(self.url)
+        self.assertContains(r, 'value="terminar"')
+        self.assertNotContains(r, 'name="descripcion"')  # DM ve los datos, no los edita
+        self.client.post(self.url, {"accion": "terminar", "codigo": "654321"})
+        self.p1.refresh_from_db()
+        self.assertEqual(self.p1.estado, E.TERMINADA)
+
+    def test_otro_centro_no_la_ve(self):
+        self.client.force_login(self.val_meix)
+        self.assertEqual(self.client.get(self.url).status_code, 403)

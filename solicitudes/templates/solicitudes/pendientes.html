@@ -60,10 +60,11 @@
       {% for p in partidas %}
         <tr>
           <td><input type="checkbox" name="partidas" value="{{ p.pk }}" data-folio="{{ p.solicitud.folio }}" aria-label="Seleccionar {{ p.solicitud.folio }}/{{ p.numero }}"></td>
-          <td><a href="{% url 'solicitudes:detalle' p.solicitud_id %}">{{ p.solicitud.folio }}</a></td>
-          <td>{{ p.numero }}</td>
+          {# Clic en el folio o la partida: abre la ficha de ESA partida. #}
+          <td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.solicitud.folio }}</a></td>
+          <td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.numero }}</a></td>
           <td>{{ p.centro.codigo|default:"—" }}</td>
-          <td>{{ p.alta.descripcion }}</td>
+          <td><a class="text-reset" href="{% url 'solicitudes:partida' p.pk %}">{{ p.alta.descripcion }}</a></td>
           <td>{{ p.alta.no_parte_original }}</td>
           <td>{{ p.alta.umb.codigo|default:"—" }}</td>
           <td>{{ p.alta.grupo_articulos.codigo|default:"—" }}</td>
@@ -85,7 +86,7 @@
     </table>
   </div>
   {% if activa == "dm" %}<p class="text-secondary small mt-2">Puedes pegar una columna de códigos desde Excel en la primera celda de Código SAP: se llenan hacia abajo. Solo se terminan las partidas que tienen código.</p>{% endif %}
-  {% if activa == "sol" %}<p class="text-secondary small mt-2">Para corregir datos abre el folio y usa "Corregir partidas".</p>{% endif %}
+  <p class="text-secondary small mt-2">Haz clic en el folio de una partida para ver su ficha completa, corregirla o actuar solo sobre ella.</p>
 </form>
 {% endblock %}
 {% block scripts %}<script src="{% static 'js/bandeja.js' %}"></script>{% endblock %}

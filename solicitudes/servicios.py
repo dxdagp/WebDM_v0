@@ -105,8 +105,9 @@ def _valor_legible(valor):
 
 
 @transaction.atomic
-def guardar_correcciones(usuario, formset, solicitud):
-    """Aplica los cambios de la tabla de corrección. Devuelve cuántos campos cambiaron.
+def guardar_correcciones(usuario, forms, solicitud):
+    """Aplica los cambios de los renglones `forms` (de la tabla o de la ficha de una partida).
+    Devuelve cuántos campos cambiaron.
 
     Cada campo que cambió deja un Evento CAMBIO_CAMPO con su valor anterior y el nuevo.
     Lo que no cambió no se registra (no se guarda cada clic, sección 15).
@@ -115,7 +116,7 @@ def guardar_correcciones(usuario, formset, solicitud):
     # usuario editaba alguien aprobó la partida, ya no es editable y no se toca.
     permitidas = {p.pk: p for p in partidas_editables(usuario, solicitud).select_for_update()}
     cambios = 0
-    for form in formset.renglones:
+    for form in forms:
         datos = form.cleaned_data
         partida = permitidas.get(datos["pid"])
         if partida is None:

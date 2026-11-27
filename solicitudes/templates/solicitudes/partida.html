@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block titulo %}{{ solicitud.folio }}/{{ p.numero }} · WebDM{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+  <div>
+    <div class="text-secondary small"><a href="{{ volver }}">Pendientes de mi atención</a> / Partida</div>
+    <h1 class="h4 fw-bold mb-1">{{ solicitud.folio }} · Partida {{ p.numero }} <span class="wd-estado align-middle">{{ p.get_estado_display }}</span></h1>
+    <div class="text-secondary">{{ solicitud.get_flujo_display }} · solicitante {{ solicitud.solicitante }} · <a href="{% url 'solicitudes:detalle' solicitud.pk %}">ver la solicitud completa</a></div>
+  </div>
+</div>
+
+{# Un solo formulario: los datos (si puedes editarlos), el motivo, el código y el botón de la acción. #}
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% if form %}{{ form.pid }}{% for e in form.non_field_errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}{% endif %}
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-8">
+      <section class="wd-ficha">
+        <h2 class="h6 fw-bold mb-3">Datos de la partida {% if form %}<small class="text-secondary fw-normal">(puedes corregirlos)</small>{% endif %}</h2>
+        <div class="wd-campos">
+          {% if form %}
+            {% for campo in form.visible_fields %}
+              <div class="wd-campo{% if campo.name == 'descripcion' or campo.name == 'compatibilidad' %} ancho{% endif %}">
+                <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+                {{ campo }}
+                {% for e in campo.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+              </div>
+              {% if campo.name == "centro" %}<div class="wd-campo"><span class="form-label">CeBe</span><div class="wd-valor auto">{{ cebe|default:"—" }}</div></div>{% endif %}
+            {% endfor %}
+          {% else %}
+            {% with a=p.alta %}
+            <div class="wd-campo"><span class="form-label">Partida</span><div class="wd-valor">{{ p.numero }}</div></div>
+            <div class="wd-campo"><span class="form-label">Centro</span><div class="wd-valor">{{ p.centro.codigo|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">CeBe</span><div class="wd-valor auto">{{ cebe|default:"—" }}</div></div>
+            <div class="wd-campo ancho"><span class="form-label">Descripción técnica del material</span><div class="wd-valor">{{ a.descripcion|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Ubicación de la refacción</span><div class="wd-valor">{{ a.ubicacion|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">No. Parte Original</span><div class="wd-valor">{{ a.no_parte_original|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Tipo de Unidad</span><div class="wd-valor">{{ a.tipo_unidad|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Marca de la unidad</span><div class="wd-valor">{{ a.marca|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Versión de la Unidad</span><div class="wd-valor">{{ a.version|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Año modelo</span><div class="wd-valor">{{ a.anio_modelo|default:"—" }}</div></div>
+            <div class="wd-campo ancho"><span class="form-label">Compatibilidad entre unidades</span><div class="wd-valor">{{ a.compatibilidad|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Unidad de medida base</span><div class="wd-valor">{{ a.umb|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Grupo de artículos</span><div class="wd-valor">{{ a.grupo_articulos|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Categoría de valoración</span><div class="wd-valor">{{ a.categoria_valoracion|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Grupo de compras</span><div class="wd-valor">{{ a.grupo_compras|default:"—" }}</div></div>
+            {% endwith %}
+          {% endif %}
+          <div class="wd-campo"><span class="form-label">Tipo de Material</span><div class="wd-valor auto">{{ p.alta.tipo_material.codigo|default:"—" }}</div></div>
+          <div class="wd-campo"><span class="form-label">Almacén</span><div class="wd-valor auto">{{ p.alta.almacen.codigo|default:"—" }}</div></div>
+          <div class="wd-campo"><span class="form-label">Código SAP</span><div class="wd-valor auto">{{ p.alta.codigo_sap|default:"—" }}</div></div>
+        </div>
+      </section>
+
+      {# Las imágenes (1 a 3 por partida) llegan en la fase 4 y se verán aquí. #}
+      <section class="wd-ficha mt-4">
+        <h2 class="h6 fw-bold mb-2">Imágenes</h2>
+        <div class="wd-imagenes">
+          {% for i in "123" %}<div class="wd-imagen-vacia">Imagen {{ i }}</div>{% endfor %}
+        </div>
+        <p class="text-secondary small mb-0 mt-2">Las imágenes se podrán subir y ver aquí a partir de la fase 4.</p>
+      </section>
+    </div>
+
+    <div class="col-12 col-xl-4">
+      <section class="wd-ficha">
+        <h2 class="h6 fw-bold mb-3">Acciones</h2>
+        {% if acciones or puede_terminar or form %}
+          {% if puede_terminar %}
+            <label class="form-label" for="codigo">Código SAP</label>
+            <input class="form-control mb-2" id="codigo" name="codigo" inputmode="numeric" maxlength="6" placeholder="6 dígitos">
+            <button name="accion" value="terminar" class="btn btn-primary w-100 mb-3">Terminar con este código</button>
+          {% endif %}
+          {% if acciones %}
+            <label class="form-label" for="motivo">Motivo <small class="text-secondary">(obligatorio para devolver o cancelar)</small></label>
+            <textarea class="form-control mb-2" id="motivo" name="motivo" rows="2"></textarea>
+            <div class="d-grid gap-2">
+              {% for a in acciones %}<button name="accion" value="{{ a.clave }}" class="btn {{ a.clase }}">{{ a.etiqueta }}</button>{% endfor %}
+            </div>
+          {% endif %}
+          {% if form %}
+            <button name="accion" value="guardar" class="btn btn-outline-primary w-100 mt-3">Solo guardar cambios</button>
+            <p class="text-secondary small mt-2 mb-0">Si cambiaste datos, Aprobar o Reenviar también los guarda.</p>
+          {% endif %}
+        {% else %}
+          <p class="text-secondary mb-0">No hay acciones para ti en esta partida en su estado actual.</p>
+        {% endif %}
+      </section>
+    </div>
+  </div>
+</form>
+
+<h2 class="h6 fw-bold mt-4">Historia de la partida</h2>
+<div class="wd-tabla-caja">
+  <table class="table table-sm mb-0 align-middle">
+    <thead><tr><th>Fecha</th><th>Evento</th><th>De → a</th><th>Usuario</th><th>Motivo o detalle</th></tr></thead>
+    <tbody>
+    {% for e in eventos %}
+      <tr>
+        <td>{{ e.fecha|date:"d/m/Y H:i" }}</td>
+        <td>{{ e.get_tipo_display }}</td>
+        <td class="small">{% if e.estado_anterior != e.estado_nuevo %}{{ e.estado_anterior|default:"—" }} → {{ e.estado_nuevo }}{% endif %}</td>
+        <td>{{ e.usuario|default:"Sistema" }}</td>
+        <td class="small">
+          {{ e.motivo }}
+          {% if e.tipo == "CAMBIO_CAMPO" %}{{ e.detalle.campo }}: «{{ e.detalle.antes }}» → «{{ e.detalle.despues }}»{% endif %}
+          {% if e.tipo == "CODIGO_SAP" %}{{ e.detalle.codigo }}{% endif %}
+          {% if e.tipo == "CORRECCION_CODIGO_SAP" %}{{ e.detalle.antes }} → {{ e.detalle.despues }}{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

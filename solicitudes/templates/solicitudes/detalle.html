@@ -14,7 +14,7 @@
     <thead><tr><th>Partida</th><th>Centro</th><th>Descripción técnica</th><th>No. Parte Original</th><th>Código SAP</th><th>Estado</th></tr></thead>
     <tbody>
     {% for p in solicitud.partidas.all %}
-      <tr><td>{{ p.numero }}</td><td>{{ p.centro|default:"—" }}</td><td>{{ p.alta.descripcion }}</td>
+      <tr><td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.numero }}</a></td><td>{{ p.centro|default:"—" }}</td><td>{{ p.alta.descripcion }}</td>
           <td>{{ p.alta.no_parte_original }}</td><td>{{ p.alta.codigo_sap|default:"—" }}</td>
           <td><span class="wd-estado">{{ p.estado }}</span></td></tr>
     {% endfor %}

@@ -148,6 +148,8 @@ Se guarda en la columna `detalle`, de tipo **`jsonb`** en PostgreSQL. Puedes con
 
 "Guardar y reenviar" corre `guardar_correcciones` y `aplicar("reenviar")` dentro de un mismo `transaction.atomic()`: si el reenvío falla, tampoco se guardan las correcciones.
 
+**La ficha de una partida** (`views.partida`, pedido de Dave). Desde la bandeja, el clic en el folio o la descripción abre `/solicitudes/partida/<id>/`: los datos de **esa sola** partida en formato formulario, su historia y solo los botones que el usuario puede usar en ese momento. Los botones salen de la misma tabla `TRANSICIONES` (función `_acciones_posibles`), así que la ficha y la bandeja nunca se contradicen. Si la partida es editable para ti, los campos aparecen como formulario y Aprobar o Reenviar guardan antes los cambios, en la misma transacción. Hay un espacio reservado para las 3 imágenes, que se llenará en la fase 4.
+
 ---
 
 ## 6. Sesiones y contraseñas (`usuarios/sesiones.py`)
@@ -262,12 +264,12 @@ Conéctate con `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U webdm -d webd
 python manage.py test
 ```
 
-Deben salir **62 pruebas OK**. Las nuevas:
+Deben salir **67 pruebas OK**. Las nuevas:
 
 | Archivo | Qué comprueba |
 | --- | --- |
 | `solicitudes/tests/test_flujo.py` | Acciones en bloque, motivo obligatorio, todo o nada, partida completa para aprobar, roles y Centros, Código SAP y su corrección, dos validadores a la vez |
-| `solicitudes/tests/test_bandejas.py` | Bandeja por Centro, contador del menú, pantallas de acción, corrección y reenvío |
+| `solicitudes/tests/test_bandejas.py` | Bandeja por Centro, contador del menú, pantallas de acción, corrección y reenvío, ficha de una partida |
 | `usuarios/tests/test_sesiones.py` | Bitácora de entrada, salida y TIMEOUT; restablecer y cambio obligatorio |
 | `usuarios/tests/test_permisos.py` | El rol ADMIN da y quita el acceso al panel, sus permisos y que no toque superusuarios |
 

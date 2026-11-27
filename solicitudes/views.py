@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.forms import Select
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import urlencode
@@ -12,7 +13,7 @@ from django.views.decorators.http import require_POST
 from catalogos.models import Almacen, CategoriaValoracion, GrupoCompras
 
 from . import bandejas, flujo, servicios
-from .forms import CorreccionFormSet, PartidasFormSet
+from .forms import CorreccionFormSet, PartidaCorreccionForm, PartidasFormSet
 from .models import Flujo, Partida, Solicitud
 
 
@@ -263,7 +264,7 @@ def corregir(request, pk):
             try:
                 # Una sola transacción: si el reenvío falla, tampoco se guardan las correcciones.
                 with transaction.atomic():
-                    n = servicios.guardar_correcciones(request.user, formset, solicitud)
+                    n = servicios.guardar_correcciones(request.user, formset.renglones, solicitud)
                     if accion == "reenviar":
                         ids = [f.cleaned_data["pid"] for f in formset.renglones if f.cleaned_data["pid"] in devueltas]
                         flujo.aplicar(request.user, "reenviar", ids)
@@ -296,3 +297,109 @@ def _entero(valor):
         return int(valor)
     except (TypeError, ValueError):
         return None
+
+
+# --- Ficha de una sola partida (pedido de Dave, 27-nov-2026) --------------------------------
+# Desde "Pendientes de mi atención" cada partida abre su propia ficha tipo formulario:
+# sus datos, su historia y solo las acciones que el usuario puede hacer sobre ella.
+
+ETIQUETAS_ACCION = {
+    "aprobar": ("Aprobar", "btn-primary"),
+    "reenviar": ("Reenviar", "btn-primary"),
+    "devolver": ("Devolver al solicitante", "btn-outline-secondary"),
+    "devolver_a_validacion": ("Devolver a VAL_MAT", "btn-outline-secondary"),
+    "cancelar": ("Cancelar partida", "btn-outline-danger"),
+    "cancelar_propia": ("Cancelar partida", "btn-outline-danger"),
+}
+PESTANA_DE_ESTADO = {
+    Partida.Estado.DEVUELTA_SOL: "sol", Partida.Estado.EN_VALIDACION: "val", Partida.Estado.EN_DM: "dm",
+}
+
+
+def _acciones_posibles(usuario, partida):
+    """Acciones de flujo.TRANSICIONES que este usuario puede aplicar a esta partida ahora."""
+    roles = flujo.roles_de(usuario)
+    en_mis_centros = usuario.centros.filter(pk=partida.centro_id).exists()
+    acciones = []
+    for clave, t in flujo.TRANSICIONES.items():
+        if t.desde != partida.estado or t.rol not in roles:
+            continue
+        alcance = partida.solicitud.solicitante_id == usuario.pk if t.solo_propias else en_mis_centros
+        if alcance:
+            etiqueta, clase = ETIQUETAS_ACCION[clave]
+            acciones.append({"clave": clave, "etiqueta": etiqueta, "clase": clase, "pide_motivo": t.pide_motivo})
+    return acciones
+
+
+@login_required
+def partida(request, pk):
+    p = get_object_or_404(
+        Partida.objects.select_related(
+            "solicitud__solicitante", "centro", "alta__ubicacion", "alta__umb", "alta__grupo_articulos",
+            "alta__categoria_valoracion", "alta__tipo_material", "alta__almacen", "alta__grupo_compras",
+        ),
+        pk=pk,
+    )
+    solicitud = p.solicitud
+    if not puede_ver(request.user, solicitud):
+        raise PermissionDenied("Esta partida no es tuya ni de tus Centros.")
+
+    editable = servicios.partidas_editables(request.user, solicitud).filter(pk=p.pk).exists()
+    centros = request.user.centros.filter(activo=True)
+    form = None
+    if editable:
+        inicial = {"pid": p.pk, "numero": p.numero, "centro": p.centro_id}
+        for campo in servicios.CAMPOS_DETALLE:
+            valor = getattr(p.alta, campo)
+            inicial[campo] = getattr(valor, "pk", valor)
+        form = PartidaCorreccionForm(request.POST or None, initial=inicial, centros=centros)
+        for campo in form.fields.values():  # estilo de Bootstrap para cada control
+            campo.widget.attrs["class"] = "form-select" if isinstance(campo.widget, Select) else "form-control"
+
+    volver = f"{reverse('solicitudes:pendientes')}?tab={PESTANA_DE_ESTADO.get(p.estado, '')}"
+
+    if request.method == "POST":
+        accion = request.POST.get("accion", "")
+        motivo = request.POST.get("motivo", "")
+        try:
+            with transaction.atomic():
+                # Si la ficha es editable, primero se guardan los cambios (también al aprobar o reenviar).
+                if form is not None:
+                    if not form.is_valid():
+                        raise flujo.AccionNoPermitida("Hay valores inválidos; corrige los campos marcados.")
+                    if accion == "reenviar":
+                        for campo in form.faltantes():
+                            form.add_error(campo, "Obligatorio para enviar.")
+                        if form.errors:
+                            raise flujo.AccionNoPermitida("Faltan datos obligatorios para reenviar.")
+                    n = servicios.guardar_correcciones(request.user, [form], solicitud)
+                if accion == "guardar":
+                    if form is None:
+                        raise flujo.AccionNoPermitida("No puedes modificar esta partida.")
+                    messages.success(request, f"Cambios guardados: {n} campo(s).")
+                    return redirect("solicitudes:partida", pk=p.pk)
+                if accion == "terminar":
+                    flujo.terminar_con_codigos(request.user, {p.pk: request.POST.get("codigo", "")})
+                    messages.success(request, f"Partida {solicitud.folio}/{p.numero} terminada; ya está en el Catálogo SAP.")
+                else:
+                    flujo.aplicar(request.user, accion, [p.pk], motivo)
+                    messages.success(request, f"Partida {solicitud.folio}/{p.numero}: {ETIQUETAS_ACCION[accion][0].lower()} listo.")
+            return redirect(volver)
+        except flujo.ErroresCodigo as e:
+            messages.error(request, e.errores[p.pk])
+        except (flujo.AccionNoPermitida, PermissionError) as e:
+            messages.error(request, str(e))
+
+    return render(request, "solicitudes/partida.html", {
+        "p": p,
+        "solicitud": solicitud,
+        "form": form,
+        "acciones": _acciones_posibles(request.user, p),
+        "puede_terminar": (
+            p.estado == Partida.Estado.EN_DM and "DM" in flujo.roles_de(request.user)
+            and request.user.centros.filter(pk=p.centro_id).exists()
+        ),
+        "eventos": p.eventos.select_related("usuario").order_by("fecha"),
+        "volver": volver,
+        "cebe": p.centro.centro_beneficio if p.centro else "",
+    })

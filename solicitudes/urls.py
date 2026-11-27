@@ -15,5 +15,6 @@ urlpatterns = [
     path("pendientes/", views.pendientes, name="pendientes"),
     path("pendientes/accion/", views.accion_en_bloque, name="accion"),
     path("pendientes/terminar/", views.terminar_dm, name="terminar_dm"),
+    path("partida/<int:pk>/", views.partida, name="partida"),
     path("partida/<int:pk>/corregir-codigo/", views.corregir_codigo, name="corregir_codigo"),
 ]
