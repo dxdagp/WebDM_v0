@@ -53,3 +53,20 @@ def con_datos_de_tabla(queryset):
         .annotate(ultimo_motivo=Subquery(ultimo_motivo))
         .order_by("actualizada")
     )
+
+
+def centros_sin_rol(ids, rol):
+    """Centros de las partidas `ids` que no tienen ningún usuario activo con `rol`.
+
+    Sirve para avisar, por ejemplo al aprobar, que nadie de DM verá esas partidas
+    porque ningún usuario DM tiene ese Centro autorizado.
+    """
+    from catalogos.models import Centro
+    from usuarios.models import Usuario
+
+    # Centros que SÍ tienen a alguien: los de usuarios activos con ese rol.
+    # centros__isnull=False importa: un NULL dentro de "NOT IN (…)" hace que SQL no devuelva NADA.
+    atendidos = Usuario.objects.filter(groups__name=rol, is_active=True, centros__isnull=False).values("centros")
+    return list(
+        Centro.objects.filter(partida__pk__in=ids).exclude(pk__in=atendidos).distinct().values_list("codigo", flat=True)
+    )

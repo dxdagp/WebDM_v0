@@ -41,7 +41,7 @@
   </aside>
   <main class="wd-contenido">
     {% for m in messages %}
-      <div class="alert {% if m.tags == 'error' %}alert-danger{% else %}alert-success{% endif %}" role="alert">{{ m }}</div>
+      <div class="alert {% if m.tags == 'error' %}alert-danger{% elif m.tags == 'warning' %}alert-warning{% else %}alert-success{% endif %}" role="alert">{{ m }}</div>
     {% endfor %}
     {% block contenido %}{% endblock %}
   </main>

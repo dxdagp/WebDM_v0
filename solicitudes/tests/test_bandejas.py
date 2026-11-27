@@ -199,3 +199,29 @@ class FichaPartidaTests(TestCase):
     def test_otro_centro_no_la_ve(self):
         self.client.force_login(self.val_meix)
         self.assertEqual(self.client.get(self.url).status_code, 403)
+
+
+class AvisoSinDmTests(TestCase):
+    """Si nadie de DM tiene el Centro, al aprobar se avisa: si no, las partidas 'desaparecen'."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.c = crear_catalogos()
+        cls.sol = crear_usuario("sol", "SOL_MAT", centros=[cls.c["mttu"]])
+        cls.val = crear_usuario("val", "VAL_MAT", centros=[cls.c["mttu"]])
+
+    def aprobar(self):
+        solicitud = crear_enviada(self.c, self.sol, n=1)
+        ids = [str(i) for i in solicitud.partidas.values_list("pk", flat=True)]
+        self.client.force_login(self.val)
+        return self.client.post(reverse("solicitudes:accion"), {"accion": "aprobar", "tab": "val", "partidas": ids},
+                                follow=True)
+
+    def test_avisa_si_ningun_dm_tiene_el_centro(self):
+        crear_usuario("dm", "DM", centros=[self.c["meix"]])  # DM existe, pero de otro Centro
+        crear_usuario("dm2", "DM")  # y otro DM sin ningún Centro
+        self.assertContains(self.aprobar(), "ningún usuario activo con rol DM tiene autorizado el Centro MTTU")
+
+    def test_no_avisa_si_hay_dm(self):
+        crear_usuario("dm", "DM", centros=[self.c["mttu"]])
+        self.assertNotContains(self.aprobar(), "ningún usuario activo")

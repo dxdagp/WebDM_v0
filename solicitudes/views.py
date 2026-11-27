@@ -179,7 +179,26 @@ def accion_en_bloque(request):
             "devolver_a_validacion": "devuelta(s) a validación",
         }
         messages.success(request, f"{n} partida(s) {textos[accion]}.")
+        _avisar_si_nadie_las_ve(request, accion, ids)
     return _volver_a_bandeja(request)
+
+
+# Rol que debe atender las partidas después de cada acción.
+SIGUIENTE_ROL = {"aprobar": "DM", "reenviar": "VAL_MAT", "devolver_a_validacion": "VAL_MAT"}
+
+
+def _avisar_si_nadie_las_ve(request, accion, ids):
+    """Si ningún usuario del siguiente rol tiene el Centro de estas partidas, nadie las verá en su bandeja."""
+    rol = SIGUIENTE_ROL.get(accion)
+    if accion == "reenviar" and "VAL_MAT" in flujo.roles_de(request.user):
+        rol = "DM"  # quien también es VAL_MAT reenvía directo a DM
+    huerfanos = bandejas.centros_sin_rol(ids, rol) if rol else []
+    if huerfanos:
+        messages.warning(
+            request,
+            f"Ojo: ningún usuario activo con rol {rol} tiene autorizado el Centro {', '.join(huerfanos)}. "
+            f"Nadie verá estas partidas hasta que ADMIN le asigne ese Centro a un usuario {rol}.",
+        )
 
 
 def _volver_a_bandeja(request):
@@ -384,6 +403,7 @@ def partida(request, pk):
                 else:
                     flujo.aplicar(request.user, accion, [p.pk], motivo)
                     messages.success(request, f"Partida {solicitud.folio}/{p.numero}: {ETIQUETAS_ACCION[accion][0].lower()} listo.")
+                    _avisar_si_nadie_las_ve(request, accion, [p.pk])
             return redirect(volver)
         except flujo.ErroresCodigo as e:
             messages.error(request, e.errores[p.pk])
