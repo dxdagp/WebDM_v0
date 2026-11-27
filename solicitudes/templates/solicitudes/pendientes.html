@@ -52,7 +52,7 @@
         <tr>
           <th><input type="checkbox" id="todas" aria-label="Seleccionar todas"></th>
           <th>Folio</th><th>Partida</th><th>Centro</th><th>Descripción técnica</th><th>No. Parte</th><th>UMB</th>
-          <th>Grupo art.</th><th>Solicitante</th><th>En espera desde</th><th>Último motivo</th><th>Motivo</th>
+          <th>Grupo art.</th><th>Solicitante</th><th>En espera desde</th><th>Motivo</th>
           {% if activa == "dm" %}<th>Código SAP</th>{% endif %}
         </tr>
       </thead>
@@ -69,10 +69,11 @@
           <td>{{ p.alta.umb.codigo|default:"—" }}</td>
           <td>{{ p.alta.grupo_articulos.codigo|default:"—" }}</td>
           <td>{{ p.solicitud.solicitante }}</td>
-          <td>{{ p.actualizada|date:"d/m/Y H:i" }} <small class="text-secondary">({{ p.actualizada|timesince }})</small></td>
-          <td class="small">{{ p.ultimo_motivo|default:"" }}</td>
+          <td title="hace {{ p.actualizada|timesince }}">{{ p.actualizada|date:"d/m/y H:i" }}</td>
           {# Motivo propio de cada partida. Al escribir, el renglón se selecciona solo (bandeja.js). #}
-          <td><textarea class="form-control form-control-sm wd-motivo" name="motivo-{{ p.pk }}" rows="1" aria-label="Motivo de {{ p.solicitud.folio }}/{{ p.numero }}">{{ p.motivo_capturado|default:'' }}</textarea></td>
+          <td class="wd-libre">
+            {% if p.ultimo_motivo %}<div class="small text-secondary mb-1" title="Motivo de la última devolución">Última devolución: {{ p.ultimo_motivo }}</div>{% endif %}
+            <textarea class="form-control form-control-sm wd-motivo" name="motivo-{{ p.pk }}" rows="1" aria-label="Motivo de {{ p.solicitud.folio }}/{{ p.numero }}">{{ p.motivo_capturado|default:'' }}</textarea></td>
           {% if activa == "dm" %}
             <td class="{% if p.error_codigo %}con-error{% endif %}">
               <input class="form-control form-control-sm wd-codigo" name="codigo-{{ p.pk }}" inputmode="numeric" maxlength="6"
@@ -82,7 +83,7 @@
           {% endif %}
         </tr>
       {% empty %}
-        <tr><td colspan="13" class="text-secondary">No tienes pendientes aquí.</td></tr>
+        <tr><td colspan="12" class="text-secondary">No tienes pendientes aquí.</td></tr>
       {% endfor %}
       </tbody>
     </table>

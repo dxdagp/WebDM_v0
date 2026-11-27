@@ -43,7 +43,7 @@ body { background: #F5F6F8; color: #1F2328; }
 
 /* --- Bandeja de pendientes (fase 3) -------------------------------------- */
 .wd-acciones { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.wd-bandeja .wd-motivo { min-width: 220px; resize: vertical; }
+.wd-bandeja .wd-motivo { min-width: 160px; resize: vertical; }
 .wd-bandeja td.con-error { background: #FFF1F0; box-shadow: inset 0 0 0 1px #CF222E; }
 .wd-bandeja .error-celda { display: block; color: #A40E26; font-size: 12px; }
 .wd-bandeja .wd-codigo { width: 100px; }
@@ -60,3 +60,18 @@ body { background: #F5F6F8; color: #1F2328; }
 .wd-valor.auto { background: #F6F8FA; color: #57606A; }
 .wd-imagenes { display: flex; flex-wrap: wrap; gap: 12px; }
 .wd-imagen-vacia { width: 140px; height: 105px; border: 1px dashed #C4CAD1; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #8C959F; font-size: 13px; }
+
+/* --- Tamaño de letra y columnas (pedido de Dave, 27-nov-2026) --------------
+   Letra más chica solo en el contenido; el menú lateral se queda igual.
+   Las columnas se ajustan a su contenido y no se parten (el folio va en un renglón);
+   si la tabla no cabe, su caja se desplaza a lo ancho (.wd-tabla-caja tiene overflow-x).
+   Solo los textos libres largos (.wd-libre) pueden ocupar varios renglones. */
+.wd-contenido { font-size: 13px; }
+.wd-contenido h1, .wd-contenido .h4 { font-size: 18px; }
+.wd-contenido .h6 { font-size: 14px; }
+.wd-contenido .form-control, .wd-contenido .form-select, .wd-contenido .btn { font-size: 13px; }
+.wd-contenido .table > :not(caption) > * > * { padding: 5px 8px; }
+.wd-contenido table th, .wd-contenido table td { white-space: nowrap; }
+.wd-contenido table .wd-libre { white-space: normal; min-width: 120px; }
+.wd-contenido .nav-link { font-size: 13px; padding: 6px 12px; }
+.wd-contenido .error-celda { white-space: normal; }

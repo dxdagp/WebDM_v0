@@ -102,7 +102,7 @@
         <td>{{ e.get_tipo_display }}</td>
         <td class="small">{% if e.estado_anterior != e.estado_nuevo %}{{ e.estado_anterior|default:"—" }} → {{ e.estado_nuevo }}{% endif %}</td>
         <td>{{ e.usuario|default:"Sistema" }}</td>
-        <td class="small">
+        <td class="small wd-libre">
           {{ e.motivo }}
           {% if e.tipo == "CAMBIO_CAMPO" %}{{ e.detalle.campo }}: «{{ e.detalle.antes }}» → «{{ e.detalle.despues }}»{% endif %}
           {% if e.tipo == "CODIGO_SAP" %}{{ e.detalle.codigo }}{% endif %}
