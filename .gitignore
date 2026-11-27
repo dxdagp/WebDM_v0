@@ -1,0 +1,10 @@
+# Entorno virtual de Python
+.venv/
+# Archivos compilados de Python
+__pycache__/
+*.pyc
+# Configuración local con contraseñas: NUNCA se sube al repositorio
+.env
+# Generados por Django
+staticfiles/
+media/
