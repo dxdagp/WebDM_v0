@@ -10,23 +10,44 @@
   <link rel="stylesheet" href="{% static 'css/webdm.css' %}">
 </head>
 <body>
-  <nav class="navbar navbar-expand bg-body-tertiary border-bottom mb-4">
-    <div class="container">
-      <a class="navbar-brand fw-semibold" href="{% url 'inicio' %}">WebDM</a>
-      {% if user.is_authenticated %}
-        <div class="d-flex align-items-center gap-3">
-          <span class="text-secondary small">{{ user }}</span>
-          {% if user.is_staff %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'admin:index' %}">Administración</a>{% endif %}
-          {# Desde Django 5 el cierre de sesión debe ser POST, por eso es un formulario. #}
-          <form method="post" action="{% url 'logout' %}">{% csrf_token %}
-            <button class="btn btn-sm btn-outline-danger" type="submit">Salir</button>
-          </form>
-        </div>
-      {% endif %}
+{% if user.is_authenticated %}
+<div class="wd-layout">
+  {# Menú lateral: lo arma core/menu.py según los roles del usuario. #}
+  <aside class="wd-menu" aria-label="Menú">
+    <div class="wd-usuario">
+      <a class="wd-marca" href="{% url 'inicio' %}">WebDM</a>
+      <strong>{{ user }}</strong>
+      <small>{{ menu_roles|default:"Sin roles asignados" }}</small>
     </div>
-  </nav>
-  <main class="container">
+    <nav>
+      {% for grupo, opciones in menu_grupos.items %}
+        <div class="wd-grupo">
+          <span class="wd-grupo-titulo">{{ grupo }}</span>
+          {% for op in opciones %}
+            {% if op.url %}
+              <a href="{{ op.url }}" {% if op.activa %}class="activa" aria-current="page"{% endif %}>{{ op.etiqueta }}</a>
+            {% else %}
+              <span class="wd-proximamente" title="Se construye en una fase posterior">{{ op.etiqueta }} <small>próximamente</small></span>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </nav>
+    {# Desde Django 5 el cierre de sesión debe ser POST, por eso es un formulario. #}
+    <form method="post" action="{% url 'logout' %}" class="wd-salir">{% csrf_token %}
+      <button type="submit">Cerrar sesión</button>
+    </form>
+  </aside>
+  <main class="wd-contenido">
+    {% for m in messages %}
+      <div class="alert {% if m.tags == 'error' %}alert-danger{% else %}alert-success{% endif %}" role="alert">{{ m }}</div>
+    {% endfor %}
     {% block contenido %}{% endblock %}
   </main>
+</div>
+{% else %}
+  <main class="container py-5">{% block contenido_publico %}{% endblock %}</main>
+{% endif %}
+{% block scripts %}{% endblock %}
 </body>
 </html>

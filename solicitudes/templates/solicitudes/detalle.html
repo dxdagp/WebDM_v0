@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titulo %}{{ solicitud }} · WebDM{% endblock %}
+{% block contenido %}
+<div class="mb-3">
+  <div class="text-secondary small">Mi trabajo / Mis solicitudes</div>
+  <h1 class="h4 fw-bold mb-1">{{ solicitud }} <span class="wd-estado align-middle">{{ solicitud.estado }}</span></h1>
+  <div class="text-secondary">{{ solicitud.get_flujo_display }} · enviada {{ solicitud.enviada|date:"d/m/Y H:i"|default:"—" }}</div>
+</div>
+<div class="wd-tabla-caja">
+  <table class="table mb-0 align-middle">
+    <thead><tr><th>Partida</th><th>Centro</th><th>Descripción técnica</th><th>No. Parte Original</th><th>Estado</th></tr></thead>
+    <tbody>
+    {% for p in solicitud.partidas.all %}
+      <tr><td>{{ p.numero }}</td><td>{{ p.centro|default:"—" }}</td><td>{{ p.alta.descripcion }}</td>
+          <td>{{ p.alta.no_parte_original }}</td><td><span class="wd-estado">{{ p.estado }}</span></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

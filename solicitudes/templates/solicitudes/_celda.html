@@ -1,0 +1,5 @@
+{# Una celda editable. Si el campo tiene error, la celda se pinta en rojo y muestra el mensaje debajo. #}
+<td class="{{ clase }}{% if campo.errors %} con-error{% endif %}">
+  {{ campo }}
+  {% for e in campo.errors %}<span class="error-celda">{{ e }}</span>{% endfor %}
+</td>

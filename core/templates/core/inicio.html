@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1 class="h4">Hola, {{ user.first_name|default:user.username }}</h1>
-<p class="text-secondary">WebDM está funcionando y conectado a PostgreSQL.</p>
-<p>Tus roles:
-  {% for g in grupos %}<span class="badge text-bg-secondary">{{ g }}</span> {% empty %}<em>aún no tienes roles asignados</em>{% endfor %}
-</p>
+<h1 class="h4 fw-bold">Hola, {{ user.first_name|default:user.username }}</h1>
+<p class="text-secondary">Usa el menú de la izquierda. Solo ves las opciones de tus roles.</p>
+{% if not grupos %}<div class="alert alert-warning">Aún no tienes roles asignados. Pide a ADMIN que te asigne uno.</div>{% endif %}
 {% endblock %}

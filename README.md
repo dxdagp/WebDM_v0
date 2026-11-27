@@ -23,7 +23,7 @@ La explicación paso a paso, incluida la creación de la base de datos en Postgr
 | --- | --- | --- |
 | 0 | Proyecto base, PostgreSQL, login | Hecha |
 | 1 | Modelo de datos, roles y panel de administrador ([guía](docs/fase-1.md)) | Hecha |
-| 2 | Captura tipo Excel de AMAT_ZRA y folios | Pendiente |
+| 2 | Captura tipo Excel de AMAT_ZRA y folios ([guía](docs/fase-2.md)) | Hecha |
 | 3 | Flujos, bandejas de VAL_MAT y DM, sesiones | Pendiente |
 | 4 | AMPL_ZRA y exportación TXT, modificaciones, servicios, imágenes, importación SAP, duplicados, vencimientos | Pendiente |
 | 5 | Despliegue en Ubuntu (Nginx, Gunicorn, systemd) | Pendiente |

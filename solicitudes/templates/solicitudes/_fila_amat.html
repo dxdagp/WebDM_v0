@@ -1,0 +1,23 @@
+{# Un renglón de la tabla AMAT_ZRA, en el orden EXACTO de la Revisión 3 (sección 7.2). #}
+<tr class="wd-fila">
+  {% include "solicitudes/_celda.html" with campo=form.numero clase="auto" %}
+  {% include "solicitudes/_celda.html" with campo=form.centro %}
+  <td class="auto" data-auto="cebe">—</td>
+  {% include "solicitudes/_celda.html" with campo=form.descripcion clase="ancha" %}
+  {% include "solicitudes/_celda.html" with campo=form.ubicacion %}
+  {% include "solicitudes/_celda.html" with campo=form.no_parte_original %}
+  {% include "solicitudes/_celda.html" with campo=form.tipo_unidad %}
+  {% include "solicitudes/_celda.html" with campo=form.marca %}
+  {% include "solicitudes/_celda.html" with campo=form.version %}
+  {% include "solicitudes/_celda.html" with campo=form.anio_modelo %}
+  {% include "solicitudes/_celda.html" with campo=form.compatibilidad %}
+  {% include "solicitudes/_celda.html" with campo=form.umb %}
+  {% include "solicitudes/_celda.html" with campo=form.grupo_articulos %}
+  {% include "solicitudes/_celda.html" with campo=form.categoria_valoracion %}
+  <td class="auto" data-auto="tipo">—</td>
+  <td class="auto" data-auto="almacen">—</td>
+  {% include "solicitudes/_celda.html" with campo=form.grupo_compras %}
+  <td class="auto">fase 4</td>
+  <td class="auto"><span class="wd-estado">BORRADOR</span></td>
+  <td class="auto"><button type="button" class="btn btn-link btn-sm p-0" data-quitar>Quitar</button></td>
+</tr>
