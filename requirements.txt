@@ -2,3 +2,4 @@
 Django>=5.2,<5.3          # framework web (5.2 es LTS: soporte hasta abril de 2028)
 psycopg[binary]>=3.2,<4   # conector de Python a PostgreSQL
 python-dotenv>=1.0,<2     # lee el archivo .env
+Pillow>=11,<12           # imágenes de partidas (conversión a WebP en la fase 4)

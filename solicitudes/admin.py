@@ -1,0 +1,84 @@
+"""Panel de solicitudes. En el MVP la operación diaria se hace en las pantallas
+de WebDM (fases 2 y 3); aquí ADMIN solo consulta. Por eso casi todo es de solo lectura."""
+
+from django.contrib import admin
+
+from . import models
+
+
+class SoloLecturaMixin:
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class PartidaInline(SoloLecturaMixin, admin.TabularInline):
+    model = models.Partida
+    fields = ("numero", "centro", "estado", "ultima_devolucion")
+    show_change_link = True
+
+
+class EventoInline(SoloLecturaMixin, admin.TabularInline):
+    model = models.Evento
+    fields = ("fecha", "partida", "tipo", "usuario", "estado_anterior", "estado_nuevo", "motivo")
+
+
+@admin.register(models.Solicitud)
+class SolicitudAdmin(SoloLecturaMixin, admin.ModelAdmin):
+    list_display = ("__str__", "flujo", "solicitante", "centro_origen", "estado", "creada", "enviada")
+    list_filter = ("flujo", "estado")
+    search_fields = ("folio", "solicitante__username")
+    inlines = [PartidaInline, EventoInline]
+
+
+class DetalleInline(SoloLecturaMixin, admin.StackedInline):
+    can_delete = False
+
+
+class DetalleAltaInline(DetalleInline):
+    model = models.DetalleAlta
+
+
+class DetalleAmpliacionInline(DetalleInline):
+    model = models.DetalleAmpliacion
+
+
+class DetalleModificacionInline(DetalleInline):
+    model = models.DetalleModificacion
+
+
+class DetalleServicioInline(DetalleInline):
+    model = models.DetalleServicio
+
+
+class ImagenInline(SoloLecturaMixin, admin.TabularInline):
+    model = models.ImagenPartida
+    fields = ("orden", "archivo", "subida", "subida_por")
+
+
+@admin.register(models.Partida)
+class PartidaAdmin(SoloLecturaMixin, admin.ModelAdmin):
+    list_display = ("__str__", "centro", "estado", "ultima_devolucion")
+    list_filter = ("estado", "solicitud__flujo", "centro")
+    search_fields = ("solicitud__folio",)
+
+    def get_inlines(self, request, obj):
+        """Muestra solo el detalle que corresponde al flujo de la solicitud."""
+        por_flujo = {
+            models.Flujo.AMAT_ZRA: [DetalleAltaInline, ImagenInline],
+            models.Flujo.AMPL_ZRA: [DetalleAmpliacionInline],
+            models.Flujo.MOD_ZRA: [DetalleModificacionInline],
+            models.Flujo.MOD_ZSA: [DetalleModificacionInline],
+            models.Flujo.ASER_ZSA: [DetalleServicioInline],
+        }
+        return por_flujo.get(obj.solicitud.flujo, []) if obj else []
+
+
+@admin.register(models.ContadorFolio)
+class ContadorFolioAdmin(SoloLecturaMixin, admin.ModelAdmin):
+    list_display = ("flujo", "anio", "ultimo")
