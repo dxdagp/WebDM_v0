@@ -12,7 +12,7 @@ Esta guía instala WebDM en una PC con Windows 10 u 11 para desarrollar y probar
 | **PostgreSQL** (16 o más nuevo, por ejemplo 18) | https://www.postgresql.org/download/windows/ (instalador de EDB) | Anota la contraseña que te pide para el usuario `postgres`. Puerto 5432. Stack Builder no hace falta. |
 | **Git** | https://git-scm.com/download/win | Deja las opciones por omisión. |
 
-> En esta guía las rutas dicen `PostgreSQL\18`. Si instalaste otra versión, cambia el `18` por la tuya (por ejemplo `16`); el servicio se llama igual, `postgresql-x64-16`.
+> En esta guía las rutas dicen `PostgreSQL\18`. Si instalaste otra versión, cambia el `18` por la tuya (por ejemplo `16`); lo mismo en el nombre del servicio (`postgresql-x64-16`).
 
 Cierra y vuelve a abrir PowerShell, y comprueba:
 
