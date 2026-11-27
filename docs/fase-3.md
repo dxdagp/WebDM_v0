@@ -194,6 +194,34 @@ CREATE INDEX "usuarios_bitacorasesion_session_key_02431dd8" ON "usuarios_bitacor
 
 ---
 
+## 6b. El rol ADMIN y los permisos del panel (`usuarios/permisos.py`)
+
+En la ficha de un usuario del panel hay dos mundos:
+
+- **WebDM**: Grupos (los roles), Centros autorizados, Activo y Debe cambiar contraseña. Esto decide qué hace en WebDM.
+- **Panel de Django**: "Es staff" (puede entrar al panel), "Es superusuario" (puede todo en el panel) y la lista de "Permisos de usuario" por tabla (agregar, modificar, eliminar, ver).
+
+Decisión de Dave: **el rol ADMIN da acceso automático al panel**. Por eso:
+
+1. Al poner o quitar el rol ADMIN, una señal `m2m_changed` marca o desmarca "Es staff". Ya no se toca a mano.
+2. Al terminar cada `migrate`, una señal `post_migrate` le da al grupo ADMIN siempre la misma lista de permisos: agregar, modificar y ver usuarios y catálogos; solo ver solicitudes, catálogo SAP, roles y bitácora. **Nunca eliminar**: usuarios y catálogos se desactivan para no perder la historia.
+3. La ficha del usuario ya no muestra "Es staff" ni "Permisos de usuario". "Es superusuario" solo la ve un superusuario, y un ADMIN no ve ni edita superusuarios.
+
+¿Por qué `post_migrate` y no una migración de datos como la de los roles? Django crea los permisos de cada tabla justo **después** de sus migraciones. En una base nueva, dentro de una migración todavía no existirían.
+
+Consulta en `psql` qué permisos tiene el rol:
+
+```sql
+SELECT p.codename
+FROM auth_group g
+JOIN auth_group_permissions gp ON gp.group_id = g.id
+JOIN auth_permission p ON p.id = gp.permission_id
+WHERE g.name = 'ADMIN'
+ORDER BY p.codename;
+```
+
+---
+
 ## 7. Ejercicios en `psql`
 
 Conéctate con `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U webdm -d webdm`.
@@ -234,13 +262,14 @@ Conéctate con `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U webdm -d webd
 python manage.py test
 ```
 
-Deben salir **58 pruebas OK**. Las nuevas:
+Deben salir **62 pruebas OK**. Las nuevas:
 
 | Archivo | Qué comprueba |
 | --- | --- |
 | `solicitudes/tests/test_flujo.py` | Acciones en bloque, motivo obligatorio, todo o nada, partida completa para aprobar, roles y Centros, Código SAP y su corrección, dos validadores a la vez |
 | `solicitudes/tests/test_bandejas.py` | Bandeja por Centro, contador del menú, pantallas de acción, corrección y reenvío |
 | `usuarios/tests/test_sesiones.py` | Bitácora de entrada, salida y TIMEOUT; restablecer y cambio obligatorio |
+| `usuarios/tests/test_permisos.py` | El rol ADMIN da y quita el acceso al panel, sus permisos y que no toque superusuarios |
 
 ## Siguiente: fase 4
 
