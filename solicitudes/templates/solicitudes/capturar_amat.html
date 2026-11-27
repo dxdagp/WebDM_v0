@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}{% if solicitud %}Borrador AMAT_ZRA{% else %}Nueva solicitud AMAT_ZRA{% endif %} · WebDM{% endblock %}
+{% block contenido %}
+<form method="post" id="form-captura" novalidate>
+  {% csrf_token %}
+  {# management_form lleva cuántos renglones hay (TOTAL_FORMS). El JavaScript lo actualiza al agregar renglones. #}
+  {{ formset.management_form }}
+
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+      <div class="text-secondary small">Materiales / Crear materiales (AMAT_ZRA)</div>
+      <h1 class="h4 fw-bold mb-1">
+        {% if solicitud %}Borrador AMAT_ZRA{% else %}Nueva solicitud AMAT_ZRA{% endif %}
+        <span class="wd-estado align-middle">BORRADOR</span>
+      </h1>
+      <div class="text-secondary">Folio: se asigna al enviar (formato AMAT_ZRA-2026-000001)</div>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="submit" name="accion" value="guardar" class="btn btn-outline-secondary">Guardar borrador</button>
+      <button type="submit" name="accion" value="enviar" class="btn btn-primary fw-semibold">Enviar</button>
+    </div>
+  </div>
+
+  {% if sin_centros %}
+    <div class="alert alert-warning">No tienes Centros autorizados. Pide a ADMIN que te asigne al menos uno.</div>
+  {% endif %}
+  {% for e in formset.non_form_errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+    <span class="text-secondary">Pega desde Excel en la celda seleccionada: una celda, columnas, filas o bloques. Si el bloque es más largo, se agregan partidas.</span>
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="agregar">+ Agregar partida</button>
+  </div>
+
+  <div class="wd-tabla-caja">
+    <table class="wd-tabla">
+      <thead>
+        <tr>
+          <th class="auto">Partida</th><th>Centro</th><th class="auto">CeBe</th>
+          <th>Descripción técnica del material</th><th>Ubicación de la refacción</th><th>No. Parte Original</th>
+          <th>Tipo de Unidad</th><th>Marca de la unidad</th><th>Versión</th><th>Año modelo</th>
+          <th>Compatibilidad</th><th>UMB</th><th>Grupo de artículos</th><th>Categoría de valoración</th>
+          <th class="auto">Tipo de Material</th><th class="auto">Almacén</th><th>Grupo de compras</th>
+          <th class="auto">Imágenes</th><th class="auto">Estado</th><th class="auto">Acción</th>
+        </tr>
+      </thead>
+      <tbody id="filas">
+        {% for form in formset %}{% include "solicitudes/_fila_amat.html" %}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="wd-leyenda mt-2">
+    <span class="l-auto">Automático o de sistema: no se pega</span>
+    <span class="l-error">Error: corrígelo para guardar o enviar</span>
+  </div>
+</form>
+
+{# Plantilla de un renglón vacío. Django pone "__prefix__" donde va el número de renglón; el JavaScript lo reemplaza. #}
+<template id="fila-vacia">{% with form=formset.empty_form %}{% include "solicitudes/_fila_amat.html" %}{% endwith %}</template>
+{{ datos_automaticos|json_script:"datos-automaticos" }}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/captura.js' %}"></script>{% endblock %}

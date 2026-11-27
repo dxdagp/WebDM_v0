@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Mis solicitudes · WebDM{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+  <div>
+    <div class="text-secondary small">Mi trabajo / Mis solicitudes</div>
+    <h1 class="h4 fw-bold mb-0">Mis solicitudes</h1>
+  </div>
+  <a class="btn btn-primary" href="{% url 'solicitudes:nueva_amat' %}">+ Crear materiales (AMAT_ZRA)</a>
+</div>
+<div class="wd-tabla-caja">
+  <table class="table mb-0 align-middle">
+    <thead><tr><th>Folio</th><th>Flujo</th><th>Estado</th><th>Partidas</th><th>Creada</th><th>Enviada</th></tr></thead>
+    <tbody>
+    {% for s in solicitudes %}
+      <tr>
+        <td>
+          {% if s.estado == "BORRADOR" %}<a href="{% url 'solicitudes:editar_amat' s.pk %}">Borrador #{{ s.pk }}</a>
+          {% else %}<a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.folio }}</a>{% endif %}
+        </td>
+        <td>{{ s.flujo }}</td>
+        <td><span class="wd-estado">{{ s.estado }}</span></td>
+        <td>{{ s.partidas.all|length }}</td>
+        <td>{{ s.creada|date:"d/m/Y H:i" }}</td>
+        <td>{{ s.enviada|date:"d/m/Y H:i"|default:"—" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="text-secondary">Aún no tienes solicitudes.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
