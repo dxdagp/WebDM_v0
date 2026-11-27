@@ -13,9 +13,8 @@ def texto_sap(valor):
     su acento ("Ó" se vuelve "O" + "◌́"). Luego descartamos los caracteres de
     categoría "Mn" (marcas que se combinan con la letra anterior).
 
-    Suposición: la Ñ se conserva, porque no es una letra acentuada sino una
-    letra propia del español. Si SAP la rechaza, basta con quitar el bloque
-    que la protege.
+    La Ñ se conserva: no es una letra acentuada sino una letra propia del
+    español, y SAP la acepta (confirmado por Dave el 27-nov-2026).
     """
     if valor is None:
         return ""

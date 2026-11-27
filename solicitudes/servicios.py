@@ -78,3 +78,69 @@ def enviar(usuario, formset, solicitud=None):
             estado_anterior=Partida.Estado.BORRADOR, estado_nuevo=estado_nuevo,
         )
     return solicitud
+
+
+# --- Fase 3: corrección de partidas ya enviadas -----------------------------------------
+
+
+def partidas_editables(usuario, solicitud):
+    """Partidas de `solicitud` que `usuario` puede corregir ahora (Revisión 3, sección 4).
+
+    - Su solicitante, las DEVUELTA_SOL.
+    - VAL_MAT, las EN_VALIDACION de sus Centros autorizados.
+    """
+    roles = set(usuario.groups.values_list("name", flat=True))
+    editables = Partida.objects.none()
+    if solicitud.solicitante_id == usuario.pk and roles & {"SOL_MAT", "VAL_MAT"}:
+        editables = editables | solicitud.partidas.filter(estado=Partida.Estado.DEVUELTA_SOL)
+    if "VAL_MAT" in roles:
+        editables = editables | solicitud.partidas.filter(
+            estado=Partida.Estado.EN_VALIDACION, centro__in=usuario.centros.values("pk")
+        )
+    return editables.order_by("numero")
+
+
+def _valor_legible(valor):
+    return "" if valor is None else str(valor)
+
+
+@transaction.atomic
+def guardar_correcciones(usuario, formset, solicitud):
+    """Aplica los cambios de la tabla de corrección. Devuelve cuántos campos cambiaron.
+
+    Cada campo que cambió deja un Evento CAMBIO_CAMPO con su valor anterior y el nuevo.
+    Lo que no cambió no se registra (no se guarda cada clic, sección 15).
+    """
+    # Se vuelven a calcular DENTRO de la transacción y con FOR UPDATE: si mientras el
+    # usuario editaba alguien aprobó la partida, ya no es editable y no se toca.
+    permitidas = {p.pk: p for p in partidas_editables(usuario, solicitud).select_for_update()}
+    cambios = 0
+    for form in formset.renglones:
+        datos = form.cleaned_data
+        partida = permitidas.get(datos["pid"])
+        if partida is None:
+            raise PermissionError("Una de las partidas ya no está disponible para corregir. Recarga la página.")
+        alta = partida.alta
+        nuevos = {c: datos.get(c) for c in CAMPOS_DETALLE}
+        nuevos["centro"] = datos.get("centro")
+        for campo, nuevo in nuevos.items():
+            destino = partida if campo == "centro" else alta
+            actual = getattr(destino, campo)
+            if actual == nuevo:
+                continue
+            Evento.objects.create(
+                solicitud=solicitud, partida=partida, usuario=usuario, tipo=Evento.Tipo.CAMBIO_CAMPO,
+                estado_anterior=partida.estado, estado_nuevo=partida.estado,
+                detalle={"campo": campo, "antes": _valor_legible(actual), "despues": _valor_legible(nuevo)},
+            )
+            setattr(destino, campo, nuevo)
+            cambios += 1
+        # Los automáticos se recalculan siempre en el servidor.
+        alta.tipo_material = alta.categoria_valoracion.tipo_material if alta.categoria_valoracion else None
+        alta.almacen = (
+            Almacen.objects.filter(centro=partida.centro, predeterminado=True, activo=True).first()
+            if partida.centro else None
+        )
+        partida.save()
+        alta.save()
+    return cambios

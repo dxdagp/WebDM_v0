@@ -131,3 +131,31 @@ class BasePartidasFormSet(forms.BaseFormSet):
 
 
 PartidasFormSet = forms.formset_factory(PartidaAltaForm, formset=BasePartidasFormSet, extra=0, can_delete=False)
+
+
+# --- Corrección de partidas ya enviadas (fase 3) ------------------------------------------
+# SOL_MAT corrige sus partidas DEVUELTA_SOL y VAL_MAT las EN_VALIDACION de sus Centros.
+# Es la misma tabla, con dos diferencias: cada renglón lleva el id de su partida
+# (oculto) y el número de partida ya no se puede cambiar ni se agregan renglones.
+
+
+class PartidaCorreccionForm(PartidaAltaForm):
+    pid = forms.IntegerField(widget=forms.HiddenInput)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # disabled: el navegador no lo deja editar y Django IGNORA lo que llegue en la petición
+        # para este campo; usa siempre el valor inicial. Nadie puede renumerar una partida enviada.
+        self.fields["numero"].disabled = True
+
+
+class BaseCorreccionFormSet(BasePartidasFormSet):
+    @property
+    def renglones(self):
+        # Aquí todos los renglones cuentan, aunque se hayan vaciado: son partidas que ya existen.
+        return [f for f in self.forms if f.is_valid()]
+
+
+CorreccionFormSet = forms.formset_factory(
+    PartidaCorreccionForm, formset=BaseCorreccionFormSet, extra=0, can_delete=False
+)

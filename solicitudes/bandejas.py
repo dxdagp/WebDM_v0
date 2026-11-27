@@ -1,0 +1,55 @@
+"""Qué partidas esperan a cada rol ("Pendientes de mi atención", Revisión 3, sección 15).
+
+Una pestaña por rol. Cada función devuelve un QuerySet: una consulta que
+todavía no se ejecuta. Así la misma función sirve para listar las partidas
+(la tabla de la bandeja) y para contarlas (el número del menú lateral, con COUNT).
+"""
+
+from django.db.models import OuterRef, Subquery
+
+from .flujo import roles_de
+from .models import Evento, Partida
+
+E = Partida.Estado
+
+# (clave en la URL, rol, título de la pestaña)
+PESTANAS = [
+    ("sol", "SOL_MAT", "Por corregir"),
+    ("val", "VAL_MAT", "Por validar"),
+    ("dm", "DM", "Datos Maestros"),
+]
+
+
+def partidas_de(usuario, clave):
+    """Partidas de la pestaña `clave` para `usuario`, sin ejecutar la consulta."""
+    if clave == "sol":
+        # Lo que me devolvieron a mí, sin importar el Centro.
+        return Partida.objects.filter(solicitud__solicitante=usuario, estado=E.DEVUELTA_SOL)
+    estado = {"val": E.EN_VALIDACION, "dm": E.EN_DM}[clave]
+    # Solo mis Centros autorizados. `centro__in=<subconsulta>` se convierte en
+    # WHERE centro_id IN (SELECT centro_id FROM usuarios_usuario_centros WHERE usuario_id = …).
+    return Partida.objects.filter(estado=estado, centro__in=usuario.centros.values("pk"))
+
+
+def pestanas_de(usuario):
+    """Pestañas visibles para el usuario según sus roles."""
+    roles = roles_de(usuario)
+    return [(clave, titulo) for clave, rol, titulo in PESTANAS if rol in roles]
+
+
+def contar(usuario):
+    """Total de pendientes del usuario para el contador del menú."""
+    return sum(partidas_de(usuario, clave).count() for clave, _ in pestanas_de(usuario))
+
+
+def con_datos_de_tabla(queryset):
+    """Agrega lo que muestra la tabla: datos del folio, del detalle y el último motivo."""
+    ultimo_motivo = (
+        Evento.objects.filter(partida=OuterRef("pk"), tipo=Evento.Tipo.DEVOLUCION).order_by("-fecha").values("motivo")[:1]
+    )
+    return (
+        queryset.select_related("solicitud__solicitante", "centro", "alta__grupo_articulos", "alta__umb")
+        # Subquery = un SELECT dentro del SELECT: para cada partida trae el motivo de su devolución más reciente.
+        .annotate(ultimo_motivo=Subquery(ultimo_motivo))
+        .order_by("actualizada")
+    )

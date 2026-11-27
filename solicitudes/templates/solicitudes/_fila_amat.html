@@ -1,4 +1,5 @@
 {# Un renglón de la tabla AMAT_ZRA, en el orden EXACTO de la Revisión 3 (sección 7.2). #}
+{# Se usa en la captura (fase 2) y en la corrección (fase 3, variable `correccion`). #}
 <tr class="wd-fila">
   {% include "solicitudes/_celda.html" with campo=form.numero clase="auto" %}
   {% include "solicitudes/_celda.html" with campo=form.centro %}
@@ -18,6 +19,6 @@
   <td class="auto" data-auto="almacen">—</td>
   {% include "solicitudes/_celda.html" with campo=form.grupo_compras %}
   <td class="auto">fase 4</td>
-  <td class="auto"><span class="wd-estado">BORRADOR</span></td>
-  <td class="auto"><button type="button" class="btn btn-link btn-sm p-0" data-quitar>Quitar</button></td>
+  <td class="auto">{% if form.pid %}{{ form.pid }}{% endif %}<span class="wd-estado">{{ form.estado_partida|default:"BORRADOR" }}</span></td>
+  {% if not correccion %}<td class="auto"><button type="button" class="btn btn-link btn-sm p-0" data-quitar>Quitar</button></td>{% endif %}
 </tr>
