@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}Corregir {{ solicitud }} · WebDM{% endblock %}
+{% block contenido %}
+<form method="post" id="form-captura" novalidate>
+  {% csrf_token %}
+  {{ formset.management_form }}
+
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+      <div class="text-secondary small"><a href="{% url 'solicitudes:detalle' solicitud.pk %}">{{ solicitud }}</a> / Corregir</div>
+      <h1 class="h4 fw-bold mb-1">Corregir {{ solicitud }}</h1>
+      <div class="text-secondary">
+        Solo aparecen las partidas que puedes corregir ahora{% if es_solicitante %} (las devueltas a ti){% else %} (las que están en validación en tus Centros){% endif %}.
+        Cada cambio queda en la historia de la partida.
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="submit" name="accion" value="guardar" class="btn btn-outline-secondary">Guardar correcciones</button>
+      {% if puede_reenviar %}<button type="submit" name="accion" value="reenviar" class="btn btn-primary fw-semibold">Guardar y reenviar</button>{% endif %}
+    </div>
+  </div>
+
+  {% for e in formset.non_form_errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
+
+  <div class="wd-tabla-caja">
+    <table class="wd-tabla">
+      <thead>
+        <tr>
+          <th class="auto">Partida</th><th>Centro</th><th class="auto">CeBe</th>
+          <th>Descripción técnica del material</th><th>Ubicación de la refacción</th><th>No. Parte Original</th>
+          <th>Tipo de Unidad</th><th>Marca de la unidad</th><th>Versión</th><th>Año modelo</th>
+          <th>Compatibilidad</th><th>UMB</th><th>Grupo de artículos</th><th>Categoría de valoración</th>
+          <th class="auto">Tipo de Material</th><th class="auto">Almacén</th><th>Grupo de compras</th>
+          <th class="auto">Imágenes</th><th class="auto">Estado</th>
+        </tr>
+      </thead>
+      <tbody id="filas">
+        {% for form in formset %}{% include "solicitudes/_fila_amat.html" with correccion=True %}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+{{ datos_automaticos|json_script:"datos-automaticos" }}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/captura.js' %}"></script>{% endblock %}

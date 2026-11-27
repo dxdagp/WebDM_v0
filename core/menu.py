@@ -10,9 +10,11 @@ y se muestra como "próximamente".
 
 from django.urls import reverse
 
+from solicitudes import bandejas
+
 OPCIONES = [
     # (grupo, etiqueta, nombre de la ruta o None, roles que la ven)
-    ("Mi trabajo", "Pendientes de mi atención", None, {"SOL_MAT", "VAL_MAT", "DM"}),
+    ("Mi trabajo", "Pendientes de mi atención", "solicitudes:pendientes", {"SOL_MAT", "VAL_MAT", "DM"}),
     ("Mi trabajo", "Mis solicitudes", "solicitudes:mis_solicitudes", {"SOL_MAT", "VAL_MAT"}),
     ("Materiales", "Crear materiales", "solicitudes:nueva_amat", {"SOL_MAT", "VAL_MAT"}),
     ("Materiales", "Ampliar a Centro", None, {"SOL_MAT", "VAL_MAT"}),
@@ -41,6 +43,8 @@ def menu(request):
             "etiqueta": etiqueta,
             "url": url,
             "activa": False,
+            # Contador de pendientes (fase 3): un COUNT por rol en cada página.
+            "contador": bandejas.contar(request.user) if ruta == "solicitudes:pendientes" else None,
         })
     # Marca como activa la opción cuya URL coincide más largo con la página actual
     # (así /solicitudes/amat/nueva/ activa "Crear materiales" y no "Mis solicitudes").

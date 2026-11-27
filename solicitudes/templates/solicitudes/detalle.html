@@ -1,18 +1,60 @@
 {% extends "base.html" %}
 {% block titulo %}{{ solicitud }} · WebDM{% endblock %}
 {% block contenido %}
-<div class="mb-3">
-  <div class="text-secondary small">Mi trabajo / Mis solicitudes</div>
-  <h1 class="h4 fw-bold mb-1">{{ solicitud }} <span class="wd-estado align-middle">{{ solicitud.estado }}</span></h1>
-  <div class="text-secondary">{{ solicitud.get_flujo_display }} · enviada {{ solicitud.enviada|date:"d/m/Y H:i"|default:"—" }}</div>
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+  <div>
+    <div class="text-secondary small">Solicitud</div>
+    <h1 class="h4 fw-bold mb-1">{{ solicitud }} <span class="wd-estado align-middle">{{ solicitud.estado }}</span></h1>
+    <div class="text-secondary">{{ solicitud.get_flujo_display }} · {{ solicitud.solicitante }} · enviada {{ solicitud.enviada|date:"d/m/Y H:i"|default:"—" }}</div>
+  </div>
+  {% if puede_corregir %}<a class="btn btn-primary" href="{% url 'solicitudes:corregir' solicitud.pk %}">Corregir partidas</a>{% endif %}
 </div>
-<div class="wd-tabla-caja">
+<div class="wd-tabla-caja mb-4">
   <table class="table mb-0 align-middle">
-    <thead><tr><th>Partida</th><th>Centro</th><th>Descripción técnica</th><th>No. Parte Original</th><th>Estado</th></tr></thead>
+    <thead><tr><th>Partida</th><th>Centro</th><th>Descripción técnica</th><th>No. Parte Original</th><th>Código SAP</th><th>Estado</th></tr></thead>
     <tbody>
     {% for p in solicitud.partidas.all %}
-      <tr><td>{{ p.numero }}</td><td>{{ p.centro|default:"—" }}</td><td>{{ p.alta.descripcion }}</td>
-          <td>{{ p.alta.no_parte_original }}</td><td><span class="wd-estado">{{ p.estado }}</span></td></tr>
+      <tr><td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.numero }}</a></td><td>{{ p.centro|default:"—" }}</td><td>{{ p.alta.descripcion }}</td>
+          <td>{{ p.alta.no_parte_original }}</td><td>{{ p.alta.codigo_sap|default:"—" }}</td>
+          <td><span class="wd-estado">{{ p.estado }}</span></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if corregibles_codigo %}
+<h2 class="h6 fw-bold">Corregir Código SAP (DM)</h2>
+<p class="text-secondary small">Cambia el código de una partida terminada sin reabrirla. El material del catálogo conserva sus Centros.</p>
+{% for p in corregibles_codigo %}
+  <form method="post" action="{% url 'solicitudes:corregir_codigo' p.pk %}" class="d-flex flex-wrap gap-2 align-items-center mb-2">
+    {% csrf_token %}
+    <span class="me-2">Partida {{ p.numero }} · actual <strong>{{ p.alta.codigo_sap }}</strong></span>
+    <input class="form-control form-control-sm" style="max-width:120px" name="codigo" maxlength="6" placeholder="Nuevo código" required>
+    <input class="form-control form-control-sm" style="max-width:320px" name="motivo" placeholder="Motivo" required>
+    <button class="btn btn-sm btn-outline-primary">Corregir</button>
+  </form>
+{% endfor %}
+{% endif %}
+
+<h2 class="h6 fw-bold mt-4">Historia</h2>
+<div class="wd-tabla-caja">
+  <table class="table table-sm mb-0 align-middle">
+    <thead><tr><th>Fecha</th><th>Partida</th><th>Evento</th><th>De → a</th><th>Usuario</th><th>Motivo o detalle</th></tr></thead>
+    <tbody>
+    {% for e in eventos %}
+      <tr>
+        <td>{{ e.fecha|date:"d/m/Y H:i" }}</td>
+        <td>{{ e.partida.numero|default:"—" }}</td>
+        <td>{{ e.get_tipo_display }}</td>
+        <td class="small">{% if e.estado_anterior != e.estado_nuevo %}{{ e.estado_anterior|default:"—" }} → {{ e.estado_nuevo }}{% endif %}</td>
+        <td>{{ e.usuario|default:"Sistema" }}</td>
+        <td class="small wd-libre">
+          {{ e.motivo }}
+          {% if e.tipo == "CAMBIO_CAMPO" %}{{ e.detalle.campo }}: «{{ e.detalle.antes }}» → «{{ e.detalle.despues }}»{% endif %}
+          {% if e.tipo == "CODIGO_SAP" %}{{ e.detalle.codigo }}{% endif %}
+          {% if e.tipo == "CORRECCION_CODIGO_SAP" %}{{ e.detalle.antes }} → {{ e.detalle.despues }}{% endif %}
+        </td>
+      </tr>
     {% endfor %}
     </tbody>
   </table>

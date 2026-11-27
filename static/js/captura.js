@@ -57,6 +57,7 @@
   }
 
   function agregarFila() {
+    if (!plantilla) return null; // en la corrección no se agregan partidas
     var indice = parseInt(total.value, 10);
     // El formset nombra cada campo "form-<renglón>-<campo>"; la plantilla trae "__prefix__".
     var html = plantilla.innerHTML.replace(/__prefix__/g, String(indice));
@@ -109,6 +110,7 @@
 
     renglones.forEach(function (renglon, i) {
       var destino = visibles[inicio + i] || agregarFila();
+      if (!destino) return; // sobran renglones y no se pueden agregar: se ignoran
       renglon.split("\t").forEach(function (valor, j) {
         var nombreCol = COLUMNAS[columnaInicial + j];
         if (!nombreCol) return; // sobran columnas a la derecha: se ignoran
@@ -142,7 +144,8 @@
   cuerpo.addEventListener("click", function (e) {
     if (e.target.matches("[data-quitar]")) { quitarFila(e.target.closest("tr.wd-fila")); hayCambios = true; }
   });
-  document.getElementById("agregar").addEventListener("click", function () { agregarFila(); });
+  var botonAgregar = document.getElementById("agregar");
+  if (botonAgregar) botonAgregar.addEventListener("click", function () { agregarFila(); });
 
   filas().forEach(actualizarAutomaticos);
 })();

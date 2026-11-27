@@ -18,6 +18,7 @@
       <a class="wd-marca" href="{% url 'inicio' %}">WebDM</a>
       <strong>{{ user }}</strong>
       <small>{{ menu_roles|default:"Sin roles asignados" }}</small>
+      <a class="wd-cuenta" href="{% url 'cambiar_password' %}">Cambiar contraseña</a>
     </div>
     <nav>
       {% for grupo, opciones in menu_grupos.items %}
@@ -25,7 +26,7 @@
           <span class="wd-grupo-titulo">{{ grupo }}</span>
           {% for op in opciones %}
             {% if op.url %}
-              <a href="{{ op.url }}" {% if op.activa %}class="activa" aria-current="page"{% endif %}>{{ op.etiqueta }}</a>
+              <a href="{{ op.url }}" {% if op.activa %}class="activa" aria-current="page"{% endif %}>{{ op.etiqueta }}{% if op.contador %}<span class="wd-contador">{{ op.contador }}</span>{% endif %}</a>
             {% else %}
               <span class="wd-proximamente" title="Se construye en una fase posterior">{{ op.etiqueta }} <small>próximamente</small></span>
             {% endif %}
@@ -40,7 +41,7 @@
   </aside>
   <main class="wd-contenido">
     {% for m in messages %}
-      <div class="alert {% if m.tags == 'error' %}alert-danger{% else %}alert-success{% endif %}" role="alert">{{ m }}</div>
+      <div class="alert {% if m.tags == 'error' %}alert-danger{% elif m.tags == 'warning' %}alert-warning{% else %}alert-success{% endif %}" role="alert">{{ m }}</div>
     {% endfor %}
     {% block contenido %}{% endblock %}
   </main>

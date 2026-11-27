@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}Pendientes de mi atención · WebDM{% endblock %}
+{% block contenido %}
+<div class="mb-3">
+  <div class="text-secondary small">Mi trabajo / Pendientes de mi atención</div>
+  <h1 class="h4 fw-bold mb-0">Pendientes de mi atención</h1>
+</div>
+
+{# Una pestaña por rol del usuario, con su número de pendientes. #}
+<ul class="nav nav-tabs mb-3">
+  {% for clave, titulo, n in pestanas %}
+    <li class="nav-item">
+      <a class="nav-link{% if clave == activa %} active{% endif %}" href="?tab={{ clave }}">{{ titulo }} <span class="badge text-bg-secondary">{{ n }}</span></a>
+    </li>
+  {% endfor %}
+</ul>
+
+<form method="get" class="d-flex flex-wrap gap-2 mb-3">
+  <input type="hidden" name="tab" value="{{ activa }}">
+  <input class="form-control form-control-sm" style="max-width:200px" name="folio" placeholder="Folio" value="{{ filtros.folio }}">
+  <input class="form-control form-control-sm" style="max-width:120px" name="centro" placeholder="Centro" value="{{ filtros.centro }}">
+  <input class="form-control form-control-sm" style="max-width:260px" name="texto" placeholder="Texto en la descripción" value="{{ filtros.texto }}">
+  <button class="btn btn-sm btn-outline-secondary">Filtrar</button>
+</form>
+
+{# Un solo formulario: las casillas, los motivos y los códigos viajan juntos. El botón elegido dice a dónde va. #}
+<form method="post" id="form-bandeja" action="{% url 'solicitudes:accion' %}">
+  {% csrf_token %}
+  <input type="hidden" name="tab" value="{{ activa }}">
+  {# Los filtros viajan con la acción para regresar a la misma vista filtrada. #}
+  {% for nombre, valor in filtros.items %}<input type="hidden" name="{{ nombre }}" value="{{ valor }}">{% endfor %}
+
+  <div class="wd-acciones mb-2">
+    {% if activa == "val" %}
+      <button name="accion" value="aprobar" class="btn btn-primary btn-sm" data-verbo="aprobar">Aprobar</button>
+      <button name="accion" value="devolver" class="btn btn-outline-secondary btn-sm" data-verbo="devolver" data-motivo>Devolver al solicitante</button>
+      <button name="accion" value="cancelar" class="btn btn-outline-danger btn-sm" data-verbo="cancelar" data-motivo>Cancelar</button>
+    {% elif activa == "sol" %}
+      <button name="accion" value="reenviar" class="btn btn-primary btn-sm" data-verbo="reenviar">Reenviar sin cambios</button>
+      <button name="accion" value="cancelar_propia" class="btn btn-outline-danger btn-sm" data-verbo="cancelar" data-motivo>Cancelar</button>
+    {% elif activa == "dm" %}
+      <button formaction="{% url 'solicitudes:terminar_dm' %}" class="btn btn-primary btn-sm" data-codigos>Terminar partidas con código</button>
+      <button name="accion" value="devolver_a_validacion" class="btn btn-outline-secondary btn-sm" data-verbo="devolver a validación" data-motivo>Devolver a VAL_MAT</button>
+    {% endif %}
+    <span class="text-secondary small">Para devolver o cancelar, escribe el motivo de cada partida en su renglón.</span>
+  </div>
+
+  <div class="wd-tabla-caja">
+    <table class="table table-sm mb-0 align-middle wd-bandeja">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="todas" aria-label="Seleccionar todas"></th>
+          <th>Folio</th><th>Partida</th><th>Centro</th><th>Descripción técnica</th><th>No. Parte</th><th>UMB</th>
+          <th>Grupo art.</th><th>Solicitante</th><th>En espera desde</th><th>Motivo</th>
+          {% if activa == "dm" %}<th>Código SAP</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in partidas %}
+        <tr>
+          <td><input type="checkbox" name="partidas" value="{{ p.pk }}" data-folio="{{ p.solicitud.folio }}" aria-label="Seleccionar {{ p.solicitud.folio }}/{{ p.numero }}"></td>
+          {# Clic en el folio o la partida: abre la ficha de ESA partida. #}
+          <td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.solicitud.folio }}</a></td>
+          <td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.numero }}</a></td>
+          <td>{{ p.centro.codigo|default:"—" }}</td>
+          <td><a class="text-reset" href="{% url 'solicitudes:partida' p.pk %}">{{ p.alta.descripcion }}</a></td>
+          <td>{{ p.alta.no_parte_original }}</td>
+          <td>{{ p.alta.umb.codigo|default:"—" }}</td>
+          <td>{{ p.alta.grupo_articulos.codigo|default:"—" }}</td>
+          <td>{{ p.solicitud.solicitante }}</td>
+          <td title="hace {{ p.actualizada|timesince }}">{{ p.actualizada|date:"d/m/y H:i" }}</td>
+          {# Motivo propio de cada partida. Al escribir, el renglón se selecciona solo (bandeja.js). #}
+          <td class="wd-libre">
+            {% if p.ultimo_motivo %}<div class="small text-secondary mb-1" title="Motivo de la última devolución">Última devolución: {{ p.ultimo_motivo }}</div>{% endif %}
+            <textarea class="form-control form-control-sm wd-motivo" name="motivo-{{ p.pk }}" rows="1" aria-label="Motivo de {{ p.solicitud.folio }}/{{ p.numero }}">{{ p.motivo_capturado|default:'' }}</textarea></td>
+          {% if activa == "dm" %}
+            <td class="{% if p.error_codigo %}con-error{% endif %}">
+              <input class="form-control form-control-sm wd-codigo" name="codigo-{{ p.pk }}" inputmode="numeric" maxlength="6"
+                     value="{{ p.codigo_capturado|default:'' }}" aria-label="Código SAP">
+              {% if p.error_codigo %}<span class="error-celda">{{ p.error_codigo }}</span>{% endif %}
+            </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="12" class="text-secondary">No tienes pendientes aquí.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if activa == "dm" %}<p class="text-secondary small mt-2">Puedes pegar una columna de códigos desde Excel en la primera celda de Código SAP: se llenan hacia abajo. Solo se terminan las partidas que tienen código.</p>{% endif %}
+  <p class="text-secondary small mt-2">Haz clic en el folio de una partida para ver su ficha completa, corregirla o actuar solo sobre ella.</p>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/bandeja.js' %}"></script>{% endblock %}

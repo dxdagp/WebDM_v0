@@ -49,6 +49,10 @@ class BitacoraSesion(models.Model):
     user_agent = models.TextField(blank=True)
     # Opcional: un navegador normalmente no revela el nombre del equipo.
     nombre_equipo = models.CharField(max_length=100, blank=True)
+    # Fase 3. Llave de la sesión de Django (tabla django_session) para saber si sigue viva,
+    # y la última vez que el usuario hizo algo, para fechar el cierre por TIMEOUT.
+    session_key = models.CharField(max_length=40, blank=True, db_index=True)
+    ultima_actividad = models.DateTimeField("última actividad", null=True, blank=True)
 
     class Meta:
         verbose_name = "sesión"
