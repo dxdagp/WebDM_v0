@@ -69,7 +69,7 @@
         {% if acciones or puede_terminar or form %}
           {% if puede_terminar %}
             <label class="form-label" for="codigo">Código SAP</label>
-            <input class="form-control mb-2" id="codigo" name="codigo" inputmode="numeric" maxlength="6" placeholder="6 dígitos">
+            <input class="form-control mb-2" id="codigo" name="codigo" inputmode="numeric" maxlength="6" placeholder="6 dígitos" onkeydown="if (event.key === 'Enter') event.preventDefault();">
             <button name="accion" value="terminar" class="btn btn-primary w-100 mb-3">Terminar con este código</button>
           {% endif %}
           {% if acciones %}

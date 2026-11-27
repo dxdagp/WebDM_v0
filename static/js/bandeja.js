@@ -33,6 +33,12 @@
     if (!window.confirm(texto)) e.preventDefault();
   });
 
+  // Enter dentro del motivo o de un código NO envía el formulario. Sin esto, el navegador
+  // "presiona" el primer botón (Aprobar o Terminar) y parece que el campo no acepta texto.
+  form.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && e.target.matches('input[type="text"], input:not([type]), input[inputmode]')) e.preventDefault();
+  });
+
   // Pegado de una columna de códigos: renglones separados por salto de línea.
   var codigos = Array.prototype.slice.call(form.querySelectorAll(".wd-codigo"));
   codigos.forEach(function (input, i) {
