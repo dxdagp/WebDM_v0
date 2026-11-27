@@ -127,7 +127,11 @@ def _registrar(partida, usuario, tipo, anterior, motivo="", detalle=None):
 
 @transaction.atomic
 def aplicar(usuario, accion, ids, motivo=""):
-    """Aplica `accion` a TODAS las partidas `ids`, o a ninguna. Devuelve cuántas movió."""
+    """Aplica `accion` a TODAS las partidas `ids`, o a ninguna. Devuelve cuántas movió.
+
+    `motivo` es un texto, o un diccionario {id de partida: texto} cuando cada partida
+    lleva su propio motivo (así lo pide Dave en la bandeja, 27-nov-2026).
+    """
     t = TRANSICIONES.get(accion)
     if t is None:
         raise AccionNoPermitida("Acción desconocida.")
@@ -136,9 +140,10 @@ def aplicar(usuario, accion, ids, motivo=""):
     ids = {int(i) for i in ids}
     if not ids:
         raise AccionNoPermitida("Selecciona al menos una partida.")
-    motivo = (motivo or "").strip()
-    if t.pide_motivo and not motivo:
-        raise AccionNoPermitida("Escribe el motivo; es obligatorio para devolver o cancelar.")
+    if isinstance(motivo, dict):
+        motivos = {int(k): (v or "").strip() for k, v in motivo.items()}
+    else:
+        motivos = {i: (motivo or "").strip() for i in ids}
 
     partidas = _bloquear(ids)
     if len(partidas) != len(ids):
@@ -151,6 +156,13 @@ def aplicar(usuario, accion, ids, motivo=""):
             f"{len(movidas)} de las partidas seleccionadas ya no están en {t.desde.label}; "
             "otra persona las movió. No se cambió ninguna. Recarga la página."
         )
+
+    if t.pide_motivo:
+        sin_motivo = [f"{p.solicitud.folio}/{p.numero}" for p in partidas if not motivos.get(p.pk)]
+        if sin_motivo:
+            raise AccionNoPermitida(
+                "El motivo es obligatorio para devolver o cancelar. No se movió ninguna. Falta en: " + ", ".join(sin_motivo)
+            )
 
     if t.exige_completa:
         incompletas = []
@@ -175,7 +187,7 @@ def aplicar(usuario, accion, ids, motivo=""):
             p.ultima_devolucion = ahora  # desde aquí se cuentan los 15/30 días (fase 4)
             campos.append("ultima_devolucion")
         p.save(update_fields=campos)
-        _registrar(p, usuario, t.evento, anterior, motivo)
+        _registrar(p, usuario, t.evento, anterior, motivos.get(p.pk, ""))
 
     for solicitud in {p.solicitud for p in partidas}:
         actualizar_cabecera(solicitud, usuario)

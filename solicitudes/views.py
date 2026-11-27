@@ -154,6 +154,13 @@ def pendientes(request):
     if filtros["texto"]:
         partidas = partidas.filter(alta__descripcion__icontains=filtros["texto"])
 
+    # Motivos escritos antes de un error (ver accion_en_bloque): se muestran de nuevo una sola vez.
+    capturados = request.session.pop("motivos_bandeja", {})
+    if capturados:
+        partidas = list(partidas)
+        for p in partidas:
+            p.motivo_capturado = capturados.get(str(p.pk), "")
+
     return render(request, "solicitudes/pendientes.html", {
         "pestanas": [(c, t, bandejas.partidas_de(request.user, c).count()) for c, t in pestanas],
         "activa": activa,
@@ -168,10 +175,14 @@ def accion_en_bloque(request):
     """Aprobar, devolver o cancelar varias partidas a la vez (todas o ninguna)."""
     accion = request.POST.get("accion", "")
     ids = request.POST.getlist("partidas")
+    # Un motivo por partida: cada renglón manda "motivo-<id>".
+    motivos = {i: request.POST.get(f"motivo-{i}", "") for i in ids}
     try:
-        n = flujo.aplicar(request.user, accion, ids, request.POST.get("motivo", ""))
+        n = flujo.aplicar(request.user, accion, ids, motivos)
     except flujo.AccionNoPermitida as e:
         messages.error(request, str(e))
+        # Para no perder lo escrito: los motivos se guardan en la sesión y la bandeja los vuelve a poner.
+        request.session["motivos_bandeja"] = {k: v for k, v in motivos.items() if v.strip()}
     else:
         textos = {
             "aprobar": "aprobada(s) y enviada(s) a Datos Maestros", "devolver": "devuelta(s) al solicitante",

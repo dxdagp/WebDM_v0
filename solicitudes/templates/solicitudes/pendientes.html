@@ -24,7 +24,7 @@
   <button class="btn btn-sm btn-outline-secondary">Filtrar</button>
 </form>
 
-{# Un solo formulario: las casillas, el motivo y los códigos viajan juntos. El botón elegido dice a dónde va. #}
+{# Un solo formulario: las casillas, los motivos y los códigos viajan juntos. El botón elegido dice a dónde va. #}
 <form method="post" id="form-bandeja" action="{% url 'solicitudes:accion' %}">
   {% csrf_token %}
   <input type="hidden" name="tab" value="{{ activa }}">
@@ -43,7 +43,7 @@
       <button formaction="{% url 'solicitudes:terminar_dm' %}" class="btn btn-primary btn-sm" data-codigos>Terminar partidas con código</button>
       <button name="accion" value="devolver_a_validacion" class="btn btn-outline-secondary btn-sm" data-verbo="devolver a validación" data-motivo>Devolver a VAL_MAT</button>
     {% endif %}
-    <input class="form-control form-control-sm" name="motivo" id="motivo" placeholder="Motivo (obligatorio para devolver o cancelar)">
+    <span class="text-secondary small">Para devolver o cancelar, escribe el motivo de cada partida en su renglón.</span>
   </div>
 
   <div class="wd-tabla-caja">
@@ -52,7 +52,7 @@
         <tr>
           <th><input type="checkbox" id="todas" aria-label="Seleccionar todas"></th>
           <th>Folio</th><th>Partida</th><th>Centro</th><th>Descripción técnica</th><th>No. Parte</th><th>UMB</th>
-          <th>Grupo art.</th><th>Solicitante</th><th>En espera desde</th><th>Último motivo</th>
+          <th>Grupo art.</th><th>Solicitante</th><th>En espera desde</th><th>Último motivo</th><th>Motivo</th>
           {% if activa == "dm" %}<th>Código SAP</th>{% endif %}
         </tr>
       </thead>
@@ -71,6 +71,8 @@
           <td>{{ p.solicitud.solicitante }}</td>
           <td>{{ p.actualizada|date:"d/m/Y H:i" }} <small class="text-secondary">({{ p.actualizada|timesince }})</small></td>
           <td class="small">{{ p.ultimo_motivo|default:"" }}</td>
+          {# Motivo propio de cada partida. Al escribir, el renglón se selecciona solo (bandeja.js). #}
+          <td><textarea class="form-control form-control-sm wd-motivo" name="motivo-{{ p.pk }}" rows="1" aria-label="Motivo de {{ p.solicitud.folio }}/{{ p.numero }}">{{ p.motivo_capturado|default:'' }}</textarea></td>
           {% if activa == "dm" %}
             <td class="{% if p.error_codigo %}con-error{% endif %}">
               <input class="form-control form-control-sm wd-codigo" name="codigo-{{ p.pk }}" inputmode="numeric" maxlength="6"
@@ -80,7 +82,7 @@
           {% endif %}
         </tr>
       {% empty %}
-        <tr><td colspan="12" class="text-secondary">No tienes pendientes aquí.</td></tr>
+        <tr><td colspan="13" class="text-secondary">No tienes pendientes aquí.</td></tr>
       {% endfor %}
       </tbody>
     </table>

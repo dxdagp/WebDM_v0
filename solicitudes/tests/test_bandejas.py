@@ -47,6 +47,24 @@ class BandejaTests(TestCase):
         self.assertRedirects(r, reverse("solicitudes:pendientes") + "?tab=val")
         self.assertEqual(set(Partida.objects.values_list("estado", flat=True)), {E.EN_DM})
 
+    def test_cada_partida_lleva_su_motivo(self):
+        self.client.force_login(self.val)
+        self.client.post(reverse("solicitudes:accion"), {
+            "accion": "devolver", "tab": "val", "partidas": self.ids,
+            f"motivo-{self.ids[0]}": "Falta la foto", f"motivo-{self.ids[1]}": "Marca incorrecta",
+        })
+        motivos = dict(Evento.objects.filter(tipo=Evento.Tipo.DEVOLUCION).values_list("partida_id", "motivo"))
+        self.assertEqual(motivos, {int(self.ids[0]): "Falta la foto", int(self.ids[1]): "Marca incorrecta"})
+
+    def test_si_falta_un_motivo_no_se_mueve_ninguna_y_se_conserva_lo_escrito(self):
+        self.client.force_login(self.val)
+        r = self.client.post(reverse("solicitudes:accion"), {
+            "accion": "cancelar", "tab": "val", "partidas": self.ids, f"motivo-{self.ids[0]}": "Duplicada",
+        }, follow=True)
+        self.assertContains(r, "Falta en: AMAT_ZRA-2026-000001/20")
+        self.assertContains(r, ">Duplicada</textarea>")
+        self.assertEqual(set(Partida.objects.values_list("estado", flat=True)), {E.EN_VALIDACION})
+
     def test_devolver_sin_motivo_muestra_error(self):
         self.client.force_login(self.val)
         r = self.client.post(reverse("solicitudes:accion"), {"accion": "devolver", "tab": "val", "partidas": self.ids},

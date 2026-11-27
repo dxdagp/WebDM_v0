@@ -32,7 +32,7 @@ python manage.py runserver
 Recorrido sugerido, con tres navegadores o ventanas privadas (una por usuario, contraseña `demo-webdm-2026`):
 
 1. `solicitante` crea y envía una solicitud con 2 partidas.
-2. `validador` abre **Pendientes de mi atención** (el número junto al menú dice cuántas tiene). Marca una partida, escribe un motivo y **Devolver al solicitante**. Marca la otra y **Aprobar**.
+2. `validador` abre **Pendientes de mi atención** (el número junto al menú dice cuántas tiene). Escribe el motivo en el renglón de una partida (se marca sola) y **Devolver al solicitante**. Marca la otra y **Aprobar**.
 3. `solicitante` ve la devuelta en **Por corregir**, abre el folio, **Corregir partidas**, cambia la marca y **Guardar y reenviar**.
 4. `validador` la aprueba.
 5. `dm` pega dos códigos de 6 dígitos (de Excel, en la primera celda de Código SAP) y **Terminar partidas con código**.
@@ -58,6 +58,8 @@ TRANSICIONES = {
 Cada renglón dice: **quién** puede hacerla, **desde** qué estado, **hacia** cuál, qué **evento** se registra y si pide motivo o exige la partida completa. Lo que no está en la tabla, no se puede hacer: por ejemplo, no hay ninguna transición de DM a DEVUELTA_SOL ni a CANCELADA, así que DM no puede devolver al solicitante ni cancelar (Revisión 3, sección 4).
 
 `Transicion` es una **dataclass**: una clase que solo guarda datos. `frozen=True` la hace de solo lectura, así nadie la cambia por accidente.
+
+**Un motivo por partida** (pedido de Dave). En la bandeja cada renglón tiene su propia caja de motivo, que llega al servidor como `motivo-<id>`. La vista arma un diccionario `{id: motivo}` y `aplicar()` revisa, ya con las partidas bloqueadas, que **cada** una tenga el suyo; si falta en alguna, no se mueve ninguna y el mensaje dice cuál. Lo que habías escrito se guarda un momento en la sesión para volver a mostrarlo.
 
 Ninguna vista escribe `partida.estado = …` por su cuenta: todas llaman a `flujo.aplicar(usuario, accion, ids, motivo)`. Así las reglas están en un solo lugar y se prueban sin navegador (`solicitudes/tests/test_flujo.py`).
 
@@ -264,7 +266,7 @@ Conéctate con `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U webdm -d webd
 python manage.py test
 ```
 
-Deben salir **67 pruebas OK**. Las nuevas:
+Deben salir **71 pruebas OK**. Las nuevas:
 
 | Archivo | Qué comprueba |
 | --- | --- |
