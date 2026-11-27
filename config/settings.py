@@ -162,4 +162,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = Path(env("DJANGO_MEDIA_ROOT", BASE_DIR / "media"))
 
+# Las pruebas guardan sus imágenes en una carpeta temporal (ver config/test_runner.py).
+TEST_RUNNER = "config.test_runner.Runner"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

@@ -40,7 +40,11 @@
       </tbody>
     </table>
   </div>
+  <div class="d-flex flex-wrap align-items-start gap-2 mt-3">
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="buscar-coincidencias">Buscar coincidencias</button>
+    <div id="wd-coincidencias" class="wd-coincidencias small flex-grow-1" data-url="{% url 'solicitudes:coincidencias' %}" aria-live="polite">Escribe una descripción o un No. Parte para ver coincidencias con el Catálogo SAP.</div>
+  </div>
 </form>
 {{ datos_automaticos|json_script:"datos-automaticos" }}
 {% endblock %}
-{% block scripts %}<script src="{% static 'js/captura.js' %}"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'js/captura.js' %}"></script><script src="{% static 'js/coincidencias.js' %}"></script>{% endblock %}

@@ -75,3 +75,10 @@ body { background: #F5F6F8; color: #1F2328; }
 .wd-contenido table .wd-libre { white-space: normal; min-width: 120px; }
 .wd-contenido .nav-link { font-size: 13px; padding: 6px 12px; }
 .wd-contenido .error-celda { white-space: normal; }
+
+/* Fase 4: imágenes y coincidencias */
+.wd-imagen { width: 180px; margin: 0; }
+.wd-imagen img { width: 180px; height: 135px; object-fit: cover; border: 1px solid #D0D7DE; border-radius: 6px; background: #F6F8FA; display: block; }
+td.wd-error { background: #FFEBE9; }
+.wd-coincidencias { border: 1px solid #D0D7DE; border-radius: 6px; padding: 8px 12px; background: #FFFDF5; }
+.wd-coincidencias .bloquea { color: #B42318; font-weight: 600; }
