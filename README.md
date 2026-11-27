@@ -1,6 +1,6 @@
 # WebDM
 
-Portal de solicitudes de alta de materiales para Datos Maestros (SAP ECC). Cada solicitud recibe un folio (por ejemplo `ZRA_2026_00001`), pasa por validación y Datos Maestros la cierra capturando el número de material SAP. No se conecta directamente a SAP.
+Portal de solicitudes para Datos Maestros (SAP ECC): alta y modificación de refacciones automotrices, ampliación de materiales a Centros, y alta y modificación de servicios. Cada solicitud recibe un folio (por ejemplo `AMAT_ZRA-2026-000123`) y sus partidas pasan por validación y Datos Maestros. No se conecta directamente a SAP. El diseño funcional de referencia es el Checkpoint de Diseño Funcional del MVP, Revisión 3.
 
 **Stack:** Python 3.12+, Django 5.2 LTS, PostgreSQL 16, Ubuntu 24.04 LTS.
 
@@ -22,8 +22,8 @@ La explicación paso a paso, incluida la creación de la base de datos en Postgr
 | Fase | Contenido | Estado |
 | --- | --- | --- |
 | 0 | Proyecto base, PostgreSQL, login | Hecha |
-| 1 | Modelos de solicitudes, roles y panel de administrador | Pendiente |
-| 2 | Formulario dinámico y folios | Pendiente |
-| 3 | Flujo y bandejas | Pendiente |
-| 4 | Correo, adjuntos, búsqueda y Excel | Pendiente |
+| 1 | Modelo de datos, roles y panel de administrador ([guía](docs/fase-1.md)) | Hecha |
+| 2 | Captura tipo Excel de AMAT_ZRA y folios | Pendiente |
+| 3 | Flujos, bandejas de VAL_MAT y DM, sesiones | Pendiente |
+| 4 | AMPL_ZRA y exportación TXT, modificaciones, servicios, imágenes, importación SAP, duplicados, vencimientos | Pendiente |
 | 5 | Despliegue en Ubuntu (Nginx, Gunicorn, systemd) | Pendiente |

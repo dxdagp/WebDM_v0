@@ -58,7 +58,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # Aplicaciones de WebDM
-    "usuarios",  # modelo de usuario propio
+    "usuarios",  # usuario propio, Centros autorizados, bitácora de sesiones
+    "catalogos",  # Centros, almacenes, UMB, grupos… (catálogos de ADMIN)
+    "catalogo_sap",  # catálogo SAP interno e importaciones
+    "solicitudes",  # solicitudes, partidas, detalles por flujo y eventos
     "core",  # páginas generales (inicio)
 ]
 
@@ -117,10 +120,18 @@ AUTH_USER_MODEL = "usuarios.Usuario"
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    # Revisión 3, sección 14: mínimo 8 caracteres.
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# La sesión expira tras 30 minutos SIN actividad (Revisión 3, sección 14).
+# SESSION_COOKIE_AGE fija la duración; SESSION_SAVE_EVERY_REQUEST reinicia el
+# reloj en cada petición, así que solo expira si el usuario deja de usar WebDM.
+SESSION_COOKIE_AGE = 30 * 60
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 # A dónde mandar al usuario para iniciar sesión, y a dónde después de entrar o salir.
 LOGIN_URL = "login"
