@@ -161,6 +161,8 @@ El despliegue definitivo (Gunicorn, Nginx, servicio de systemd) es la fase 5.
 | --- | --- |
 | `'py' no se reconoce…` | Python no quedó en el PATH. Reinstala marcando "Add python.exe to PATH". |
 | `password authentication failed for user "webdm"` | `DB_PASSWORD` en `.env` no coincide con la del paso 2. Revisa comillas, espacios o `#`, o vuelve a empezar con la sección "Empezar de cero". |
+| `Restart-Service : No pudo iniciarse el servicio` después de editar `pg_hba.conf` | Una línea quedó mal escrita. Revisa con `Select-String -Path "C:\Program Files\PostgreSQL\18\data\pg_hba.conf" -Pattern "^(host\|local)"` y el registro en `data\log`. |
+| `fe_sendauth: no password supplied` con `-w` | `trust` no está activo: editaste las líneas de `replication` en vez de las de `all`, o no reiniciaste el servicio. |
 | `psql` no muestra lo que escribo en la contraseña | Es normal: no muestra ni asteriscos. Escríbela y da Enter. |
 | `connection refused … port 5432` | El servicio de PostgreSQL no está corriendo: Inicio, "Servicios", busca `postgresql-x64-18` e inícialo. |
 | `UnicodeDecodeError` al conectar | Suele ser un error de contraseña que PostgreSQL reporta en español con otra codificación. Revisa usuario y contraseña del `.env`. |
@@ -188,7 +190,7 @@ Pon la misma contraseña en `.env` y corre otra vez `python manage.py migrate` y
 **Si olvidaste la contraseña de `postgres`:**
 
 1. PowerShell **como administrador**: `notepad "C:\Program Files\PostgreSQL\18\data\pg_hba.conf"`.
-2. En las líneas de `127.0.0.1/32` y `::1/128` cambia `scram-sha-256` por `trust` y guarda. `pg_hba.conf` es la lista de quién puede entrar y cómo; `trust` deja entrar sin contraseña desde esta PC.
+2. En las líneas `host    all    all    127.0.0.1/32` y `host    all    all    ::1/128` cambia `scram-sha-256` por `trust` y guarda. **Ojo:** son las que dicen `all` en la segunda columna, no las de `replication` (esas solo sirven para copiar la base a otro servidor). Revisa que quede exactamente `trust`, sin restos como `trust6`: si el método no existe, PostgreSQL **no arranca**. `pg_hba.conf` es la lista de quién puede entrar y cómo; `trust` deja entrar sin contraseña desde esta PC.
 3. `Restart-Service postgresql-x64-18` para que PostgreSQL relea el archivo.
 4. `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -h 127.0.0.1` y dentro `ALTER USER postgres PASSWORD 'nueva-contraseña';`.
 5. Regresa `trust` a `scram-sha-256`, guarda y reinicia el servicio otra vez. **Nunca lo dejes en `trust`.**
