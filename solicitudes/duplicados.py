@@ -9,9 +9,14 @@ Solo se comparan la Descripción técnica y el No. Parte Original. Sin IA.
 | Descripción exacta, No. Parte distinto   | ADVERTENCIA            | No        |
 | Descripción parecida al 80 % o más       | POSIBLE                | No        |
 
-Cómo se mide "parecida": `difflib.SequenceMatcher` de Python (biblioteca estándar)
-compara dos textos y da un número de 0 a 1 según cuántos caracteres comparten en el
-mismo orden. "FILTRO DE AIRE" contra "FILTRO AIRE" da 0.88.
+Cómo se mide "parecida" (ajuste pedido por Dave: ACEITE y AIRE son cosas distintas):
+se compara PALABRA por PALABRA, no letra por letra.
+1. Se quitan las palabras vacías (DE, PARA, CON…): "FILTRO DE AIRE" → FILTRO, AIRE.
+2. Dos palabras "coinciden" si se parecen al 85 % o más letra por letra
+   (`difflib.SequenceMatcher`). Así se perdona un error de dedo (AIRE/AIRRE = 89 %)
+   pero no otra palabra (AIRE/ACEITE = 60 %).
+3. Parecido = 2 × palabras que coinciden ÷ total de palabras de los dos textos.
+   "FILTRO AIRE" vs "FILTRO DE AIRE" = 100 %; vs "FILTRO DE ACEITE" = 50 %.
 
 Para no comparar contra TODO el catálogo, primero PostgreSQL filtra candidatos que
 compartan alguna palabra de 3 letras o más (ILIKE), y solo a esos se les calcula el
@@ -51,8 +56,28 @@ class Coincidencia:
         return {**self.__dict__, "bloquea": self.bloquea}
 
 
+PALABRAS_VACIAS = {"DE", "DEL", "LA", "EL", "LOS", "LAS", "PARA", "CON", "Y", "A", "EN", "P/"}
+UMBRAL_PALABRA = 0.85  # cuánto deben parecerse dos palabras para contar como la misma
+
+
+def palabras(texto):
+    return [p for p in texto.split() if p not in PALABRAS_VACIAS]
+
+
 def parecido(a, b):
-    return SequenceMatcher(None, a, b).ratio()
+    """De 0 a 1: qué tanto comparten dos descripciones, palabra por palabra."""
+    pa, pb = palabras(a), palabras(b)
+    if not pa or not pb:
+        return 0.0
+    libres = list(pb)
+    iguales = 0
+    for palabra in pa:
+        # La palabra de `b` que más se le parece y aún no se usó.
+        mejor = max(libres, key=lambda otra: SequenceMatcher(None, palabra, otra).ratio(), default=None)
+        if mejor is not None and SequenceMatcher(None, palabra, mejor).ratio() >= UMBRAL_PALABRA:
+            iguales += 1
+            libres.remove(mejor)
+    return 2 * iguales / (len(pa) + len(pb))
 
 
 def buscar(descripcion, no_parte=""):

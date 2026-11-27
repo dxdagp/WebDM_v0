@@ -126,21 +126,32 @@ Se exige en tres momentos:
 
 "Exacto" se mide **después de normalizar** con `texto_sap` (mayúsculas, sin acentos, espacios limpios). Así, `Filtró de aire` y `FILTRO DE AIRE` son iguales.
 
-### 4.2 Cómo se mide "parecida"
+### 4.2 Cómo se mide "parecida": palabra por palabra
 
-`difflib.SequenceMatcher` es de la biblioteca estándar de Python. Busca los pedazos de texto que coinciden en el mismo orden y da un número de 0 a 1:
+La primera versión comparaba **letra por letra** con `difflib.SequenceMatcher` y daba esto:
 
 ```python
->>> from difflib import SequenceMatcher
->>> SequenceMatcher(None, "FILTRO DE AIRE", "FILTRO AIRE").ratio()
-0.88
 >>> SequenceMatcher(None, "FILTRO DE AIRE", "FILTRO DE ACEITE").ratio()
-0.866
->>> SequenceMatcher(None, "FILTRO DE AIRE", "FILTRO HIDRAULICO").ratio()
-0.645
+0.866   # ¡87 %! Comparten "FILTRO DE A…E": muchas letras, pero es otra pieza
 ```
 
-Fíjate en el segundo: un filtro de **aceite** sale como POSIBLE coincidencia de uno de **aire**, al 87 %. Para descripciones cortas, el 80 % es generoso. La Revisión 3 ya dice que el umbral "se ajustará con datos reales". Está en una sola línea: `UMBRAL = 0.80`.
+Dave lo detectó: aceite y aire son cosas totalmente distintas. Bajar el umbral (por ejemplo a 70 %) habría empeorado el problema, porque **más** cosas saldrían como parecidas. Subirlo a 90 % sí sacaría ese caso, pero también dejaría fuera parecidos reales como "FILTRO AIRE" (88 %). El problema no era el número, era **qué** se comparaba. Por eso ahora se compara por palabras:
+
+1. Se quitan las palabras vacías (`DE`, `PARA`, `CON`, `EL`, `LA`…): "FILTRO DE AIRE" queda en `FILTRO`, `AIRE`.
+2. Dos palabras cuentan como la misma si se parecen al 85 % o más letra por letra. Así se perdona un error de dedo (`AIRE`/`AIRRE` = 89 %), pero no una palabra distinta (`AIRE`/`ACEITE` = 60 %).
+3. Parecido = 2 × palabras iguales ÷ total de palabras de los dos textos.
+
+| Contra "FILTRO DE AIRE" | Antes (letras) | Ahora (palabras) | ¿Sale? |
+| --- | --- | --- | --- |
+| FILTRO AIRE | 88 % | 100 % | Sí |
+| FILTRO DE AIRRE (error de dedo) | 97 % | 100 % | Sí |
+| AIRE FILTRO (otro orden) | 48 % | 100 % | Sí |
+| FILTRO DE AIRE MOTOR | 82 % | 80 % | Sí |
+| FILTRO DE ACEITE | 87 % | 50 % | **No** |
+| FILTRO HIDRAULICO | 65 % | 50 % | No |
+| BALATA DELANTERA vs BALATA TRASERA | 73 % | 50 % | No |
+
+El umbral se queda en 80 % (`UMBRAL` en `solicitudes/duplicados.py`), y la tolerancia por palabra en 85 % (`UMBRAL_PALABRA`).
 
 ### 4.3 El SQL: primero filtra PostgreSQL, después compara Python
 

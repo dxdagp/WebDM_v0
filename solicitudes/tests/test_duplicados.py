@@ -34,9 +34,15 @@ class BuscarTests(TestCase):
         self.assertEqual(self.tipos("FILTRO DE AIRE", "OTRO"), [("ADVERTENCIA", "100001")])
 
     def test_parecida_es_posible(self):
-        self.assertEqual(self.tipos("FILTRO AIRE"), [("POSIBLE", "100001")])  # 88 %
-        self.assertEqual(self.tipos("FILTRO HIDRAULICO"), [])  # 65 %, debajo del 80 %
-        # Ojo: "FILTRO DE ACEITE" SÍ sale (87 %): el umbral se ajustará con datos reales.
+        self.assertEqual(self.tipos("FILTRO AIRE"), [("POSIBLE", "100001")])  # sin "DE": 100 %
+        self.assertEqual(self.tipos("FILTRO DE AIRRE"), [("POSIBLE", "100001")])  # error de dedo
+        self.assertEqual(self.tipos("FILTRO DE AIRE MOTOR"), [("POSIBLE", "100001")])  # 80 %
+
+    def test_otra_palabra_no_es_parecida(self):
+        # Pedido de Dave: ACEITE y AIRE son cosas distintas (50 %, debajo del 80 %).
+        self.assertEqual(self.tipos("FILTRO DE ACEITE"), [])
+        self.assertEqual(self.tipos("FILTRO HIDRAULICO"), [])
+        self.assertEqual(duplicados.parecido("BALATA DELANTERA", "BALATA TRASERA"), 0.5)
 
     def test_endpoint_json(self):
         self.client.force_login(self.u)
