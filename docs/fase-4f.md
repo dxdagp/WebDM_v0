@@ -33,7 +33,7 @@ python manage.py vencimientos --simular    # lista lo que cancelaría hoy, sin c
 Para ver el indicador sin esperar 15 días:
 
 1. Como `validador`, devuelve una partida al solicitante.
-2. Cambia la fecha de la devolución en `psql`, o en **Administración → Partidas** (campo "última devolución"):
+2. Cambia la fecha de la devolución en `psql` (Administración es de solo lectura para partidas):
 
    ```sql
    UPDATE solicitudes_partida SET ultima_devolucion = now() - interval '20 days' WHERE id = <id>;
