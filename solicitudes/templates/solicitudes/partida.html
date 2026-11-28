@@ -8,6 +8,12 @@
     <h1 class="h4 fw-bold mb-1">{{ solicitud.folio|default:"Borrador" }} · Partida {{ p.numero }} <span class="wd-estado align-middle">{{ p.get_estado_display }}</span></h1>
     <div class="text-secondary">{{ solicitud.get_flujo_display }} · solicitante {{ solicitud.solicitante }} · <a href="{% url 'solicitudes:detalle' solicitud.pk %}">ver la solicitud completa</a></div>
   </div>
+  {# Flechas: partida anterior y siguiente de esta misma solicitud. #}
+  <nav class="wd-flechas" aria-label="Moverse entre partidas">
+    {% if anterior %}<a class="btn btn-outline-secondary" href="{% url 'solicitudes:partida' anterior.pk %}" title="Partida {{ anterior.numero }}" data-navegar>&#8592;</a>{% else %}<span class="btn btn-outline-secondary disabled" aria-hidden="true">&#8592;</span>{% endif %}
+    <span class="text-secondary small">Partida {{ posicion }} de {{ total_partidas }}</span>
+    {% if siguiente %}<a class="btn btn-outline-secondary" href="{% url 'solicitudes:partida' siguiente.pk %}" title="Partida {{ siguiente.numero }}" data-navegar>&#8594;</a>{% else %}<span class="btn btn-outline-secondary disabled" aria-hidden="true">&#8594;</span>{% endif %}
+  </nav>
 </div>
 
 {# Un solo formulario: los datos (si puedes editarlos), el motivo, el código y el botón de la acción. #}
@@ -94,7 +100,7 @@
       <div class="wd-imagenes">
         {% for img in imagenes %}
           <figure class="wd-imagen">
-            <a href="{% url 'solicitudes:ver_imagen' img.pk %}" target="_blank" rel="noopener" title="Abrir en tamaño completo">
+            <a href="{% url 'solicitudes:ver_imagen' img.pk %}" target="_blank" rel="noopener" title="Ver imagen {{ img.orden }}" data-visor>
               <img src="{% url 'solicitudes:ver_imagen' img.pk %}" alt="Imagen {{ img.orden }} de la partida {{ p.numero }}">
             </a>
             <figcaption class="small text-secondary d-flex justify-content-between align-items-center">
@@ -172,5 +178,14 @@
     </tbody>
   </table>
 </div>
+
+{# Visor de imágenes: un solo cuadro que el JavaScript llena con la imagen elegida. #}
+<div class="wd-visor" id="visor" hidden role="dialog" aria-modal="true" aria-label="Imagen ampliada">
+  <div class="wd-visor-caja">
+    <button type="button" class="wd-visor-cerrar" aria-label="Cerrar">&times;</button>
+    <img alt="" title="Clic para abrir en tamaño completo en otra pestaña">
+    <div class="wd-lupa" aria-hidden="true"></div>
+  </div>
+</div>
 {% endblock %}
-{% block scripts %}{% if form %}<script src="{% static 'js/coincidencias.js' %}"></script>{% endif %}{% endblock %}
+{% block scripts %}{% if form %}<script src="{% static 'js/coincidencias.js' %}"></script>{% endif %}<script src="{% static 'js/ficha.js' %}"></script>{% endblock %}

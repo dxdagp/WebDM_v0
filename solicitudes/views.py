@@ -463,7 +463,24 @@ def partida(request, pk):
         "edita_imagenes": imagenes.puede_editar(request.user, p),
         "lugares_libres": imagenes.MAX_IMAGENES - p.imagenes.count(),
         "coincidencias": _coincidencias_de(p),
+        **_vecinas(p),
     })
+
+
+def _vecinas(p):
+    """La partida anterior y la siguiente de la MISMA solicitud, por número (pedido de Dave:
+    flechas para moverse entre partidas sin regresar a la lista).
+
+    SQL de "siguiente": ... WHERE solicitud_id = 7 AND numero > 20 ORDER BY numero LIMIT 1
+    """
+    hermanas = Partida.objects.filter(solicitud_id=p.solicitud_id)
+    numeros = list(hermanas.order_by("numero").values_list("numero", flat=True))
+    return {
+        "anterior": hermanas.filter(numero__lt=p.numero).order_by("-numero").first(),
+        "siguiente": hermanas.filter(numero__gt=p.numero).order_by("numero").first(),
+        "posicion": numeros.index(p.numero) + 1,
+        "total_partidas": len(numeros),
+    }
 
 
 def _volver_de_ficha(usuario, p):

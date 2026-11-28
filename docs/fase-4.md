@@ -98,13 +98,31 @@ transaction.on_commit(lambda: archivo.storage.delete(archivo.name))
 
 ¿Por qué esperar? Si algo fallara después del `DELETE`, PostgreSQL haría `ROLLBACK` y el renglón volvería, pero el archivo ya no existiría si lo hubiéramos borrado antes. PostgreSQL puede deshacer, pero el disco no.
 
-### 3.4 Las imágenes no se publican en `/media/`
+### 3.4 Visor, lupa y flechas (pedido de Dave)
+
+En la ficha de la partida (`static/js/ficha.js`):
+
+- **Clic en la miniatura**: la imagen se ve grande en el centro de la pantalla, ajustada a la ventana (máximo 85 % del ancho y del alto), no en su tamaño real.
+- **Cerrar**: con el tache de arriba a la derecha, con un clic fuera de la imagen o con Esc.
+- **Lupa**: al pasar el cursor sobre la imagen, un círculo muestra esa zona 2.5 veces más grande. Es un `<div>` redondo cuyo fondo es la misma imagen, agrandada y recorrida según la posición del cursor.
+- **Clic sobre la imagen ampliada**: se abre completa en otra pestaña.
+- **Flechas ← →** junto al título: van a la partida anterior o siguiente **de la misma solicitud**, por número. Si cambiaste datos sin guardar, preguntan antes de salir.
+
+El SQL de "siguiente" es tan simple como suena:
+
+```sql
+SELECT * FROM solicitudes_partida
+WHERE solicitud_id = 7 AND numero > 20
+ORDER BY numero ASC LIMIT 1;
+```
+
+### 3.5 Las imágenes no se publican en `/media/`
 
 Lo típico en Django es que Nginx sirva `/media/` directo. Eso significa que **cualquiera con la liga** ve la foto. Aquí cada imagen pasa por la vista `ver_imagen`, que primero revisa `puede_ver` (el mismo permiso de la solicitud). Un usuario de otro Centro recibe 403.
 
 Para producción (fase 5) se puede acelerar con `X-Accel-Redirect` de Nginx manteniendo esta revisión.
 
-### 3.5 Mínimo una imagen
+### 3.6 Mínimo una imagen
 
 Se exige en tres momentos:
 

@@ -137,3 +137,17 @@ class PermisosYPantallaTests(TestCase):
         self.assertContains(r, "al menos 1 imagen")
         self.p.refresh_from_db()
         self.assertEqual(self.p.estado, E.EN_VALIDACION)
+
+
+class FlechasFichaTests(TestCase):
+    def test_flechas_entre_partidas_de_la_misma_solicitud(self):
+        c = crear_catalogos()
+        sol = crear_usuario("sol", "SOL_MAT", centros=[c["mttu"]])
+        solicitud = crear_enviada(c, sol, n=3)
+        p10, p20, p30 = solicitud.partidas.order_by("numero")
+        self.client.force_login(sol)
+        r = self.client.get(reverse("solicitudes:partida", args=[p20.pk]))
+        self.assertEqual((r.context["anterior"], r.context["siguiente"]), (p10, p30))
+        self.assertContains(r, "Partida 2 de 3")
+        r = self.client.get(reverse("solicitudes:partida", args=[p10.pk]))
+        self.assertIsNone(r.context["anterior"])
