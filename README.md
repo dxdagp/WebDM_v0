@@ -2,7 +2,7 @@
 
 Portal de solicitudes para Datos Maestros (SAP ECC): alta y modificación de refacciones automotrices, ampliación de materiales a Centros, y alta y modificación de servicios. Cada solicitud recibe un folio (por ejemplo `AMAT_ZRA-2026-000123`) y sus partidas pasan por validación y Datos Maestros. No se conecta directamente a SAP. El diseño funcional de referencia es el Checkpoint de Diseño Funcional del MVP, Revisión 3.
 
-**Stack:** Python 3.12+, Django 5.2 LTS, PostgreSQL 16, Ubuntu 24.04 LTS.
+**Stack:** Python 3.12+, Django 5.2 LTS, PostgreSQL 16. Servidor: Ubuntu 24.04 LTS; también corre en Windows para desarrollo.
 
 ## Arranque rápido (desarrollo)
 
@@ -15,7 +15,7 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-La explicación paso a paso, incluida la creación de la base de datos en PostgreSQL, está en [docs/fase-0.md](docs/fase-0.md).
+La explicación paso a paso, incluida la creación de la base de datos en PostgreSQL, está en [docs/fase-0.md](docs/fase-0.md) (Ubuntu) y en [docs/windows.md](docs/windows.md) (Windows, con comandos de PowerShell).
 
 ## Fases
 
