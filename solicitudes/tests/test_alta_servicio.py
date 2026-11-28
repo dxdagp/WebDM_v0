@@ -18,7 +18,10 @@ class Base(TestCase):
     def setUpTestData(cls):
         cls.c = c = crear_catalogos()  # UMB PZA, grupo de artículos GA1
         cls.ser = UMB.objects.create(codigo="SER", descripcion="Servicio")
-        TipoMaterial.objects.create(codigo="ZSA", descripcion="Servicios", umb_predeterminada=cls.ser)
+        cls.zsa = TipoMaterial.objects.create(codigo="ZSA", descripcion="Servicios", umb_predeterminada=cls.ser)
+        cls.zra = c["tipo"]  # ZRA, con UMB predeterminada PZA: el tipo decide la UMB propuesta
+        cls.zra.umb_predeterminada = c["umb"]
+        cls.zra.save()
         cls.sol = crear_usuario("sol", "SOL_MAT", centros=[c["mttu"]])
         cls.val = crear_usuario("val", "VAL_MAT", centros=[c["meix"]])  # sin el Centro del solicitante: igual lo ve
         cls.dm = crear_usuario("dm", "DM", centros=[c["meix"]])
@@ -35,8 +38,8 @@ class Base(TestCase):
         self.client.force_login(usuario)
         return self.client.post(url or reverse("solicitudes:nueva_aser"), datos, follow=True)
 
-    def renglon(self, numero=10, descripcion="Alineación y balanceo", umb="", grupo=None):
-        return {"numero": numero, "descripcion": descripcion, "umb": umb,
+    def renglon(self, numero=10, descripcion="Alineación y balanceo", umb="", grupo=None, tipo=None):
+        return {"numero": numero, "tipo_material": (tipo or self.zsa).pk, "descripcion": descripcion, "umb": umb,
                 "grupo_articulos": (grupo or self.c["grupo_art"]).pk}
 
 
@@ -45,6 +48,8 @@ class CapturaTests(Base):
         self.client.force_login(self.sol)
         r = self.client.get(reverse("solicitudes:nueva_aser"))
         self.assertContains(r, f'<option value="{self.ser.pk}" selected>')
+        self.assertContains(r, f'<option value="{self.zsa.pk}" selected>')
+        self.assertContains(r, f'"{self.zra.pk}": "{self.c["umb"].pk}"')  # la pantalla sabe la UMB de cada tipo
         self.assertContains(r, 'href="/solicitudes/aser/nueva/" class="activa"')
         self.assertEqual(r.content.decode().count('value="validar"'), 1)
 
@@ -54,9 +59,15 @@ class CapturaTests(Base):
         d = Partida.objects.get().servicio
         self.assertEqual((d.descripcion, d.umb, d.partida.centro), ("ALINEACION Y BALANCEO", self.ser, None))
 
+    def test_umb_depende_del_tipo(self):
+        self.post(self.sol, "guardar", self.renglon(tipo=self.zra), self.renglon(20, descripcion="Lavado", umb=self.ser.pk, tipo=self.zra))
+        d10, d20 = (p.servicio for p in Partida.objects.order_by("numero"))
+        self.assertEqual((d10.tipo_material, d10.umb), (self.zra, self.c["umb"]))  # vacía: la de ZRA
+        self.assertEqual(d20.umb, self.ser)  # la que eligió el usuario no se cambia
+
     def test_obligatorios_y_repetidos(self):
-        r = self.post(self.sol, "enviar", {"numero": 10, "descripcion": "Lavado"})
-        self.assertContains(r, "Obligatorio para enviar")
+        r = self.post(self.sol, "enviar", {"numero": 10, "descripcion": "Lavado", "grupo_articulos": self.c["grupo_art"].pk})
+        self.assertContains(r, "Obligatorio para enviar")  # falta el tipo (y sin tipo no hay UMB propuesta)
         r = self.post(self.sol, "guardar", self.renglon(10), self.renglon(20))
         self.assertContains(r, "Descripción repetida (partida 10)")
 
@@ -69,9 +80,9 @@ class CapturaTests(Base):
         self.assertContains(r, "ASER_ZSA-")  # un parecido solo avisa
 
     def test_sin_umb_predeterminada_avisa(self):
-        TipoMaterial.objects.filter(codigo="ZSA").update(umb_predeterminada=None)
+        TipoMaterial.objects.update(umb_predeterminada=None)
         self.client.force_login(self.sol)
-        self.assertContains(self.client.get(reverse("solicitudes:nueva_aser")), "no tiene UMB predeterminada")
+        self.assertContains(self.client.get(reverse("solicitudes:nueva_aser")), "Ningún tipo de servicio tiene UMB predeterminada")
         r = self.post(self.sol, "enviar", self.renglon())
         self.assertContains(r, "Obligatorio para enviar")
 
@@ -86,7 +97,7 @@ class FlujoTests(Base):
         self.assertEqual(bandejas.partidas_de(self.val, "val").filter(solicitud=s).count(), 2)
         self.client.force_login(self.val)
         r = self.client.get(reverse("solicitudes:pendientes"), {"tab": "val"})
-        self.assertContains(r, "Servicio · ALINEACION Y BALANCEO")
+        self.assertContains(r, "Servicio ZSA · ALINEACION Y BALANCEO")
 
     def test_dm_exporta_y_termina_con_codigo(self):
         s = self.enviada()
@@ -131,7 +142,7 @@ class FlujoTests(Base):
         flujo.aplicar(self.val, "devolver", [p.pk], {str(p.pk): "Falta detalle"})
         self.client.force_login(self.sol)
         datos = {"form-TOTAL_FORMS": "1", "form-INITIAL_FORMS": "1", "accion": "reenviar", "form-0-pid": p.pk,
-                 "form-0-numero": "10", "form-0-descripcion": "Alineación 3D", "form-0-umb": self.ser.pk,
+                 "form-0-numero": "10", "form-0-tipo_material": self.zsa.pk, "form-0-descripcion": "Alineación 3D", "form-0-umb": self.ser.pk,
                  "form-0-grupo_articulos": self.c["grupo_art"].pk}
         r = self.client.post(reverse("solicitudes:corregir", args=[s.pk]), datos, follow=True)
         self.assertContains(r, "Partidas reenviadas (1 campo(s) corregido(s))")
@@ -144,3 +155,4 @@ class FlujoTests(Base):
         r = self.client.get(reverse("solicitudes:detalle", args=[s.pk]))
         self.assertContains(r, "LAVADO DE MOTOR")
         self.assertContains(r, "<td>SER</td>", html=False)
+        self.assertContains(r, "<td>ZSA</td>", html=False)

@@ -163,7 +163,7 @@ def detalle(request, pk):
             "partidas__alta", "partidas__centro", "partidas__ampliacion__material", "partidas__ampliacion__centro_origen",
             "partidas__ampliacion__almacen_destino", "partidas__ampliacion__almacen_modelo",
             "partidas__ampliacion__planificador", "partidas__ampliacion__grupo_compras",
-            "partidas__modificacion__material", "partidas__servicio__umb", "partidas__servicio__grupo_articulos",
+            "partidas__modificacion__material", "partidas__servicio__umb", "partidas__servicio__tipo_material", "partidas__servicio__grupo_articulos",
         ), pk=pk
     )
     if not puede_ver(request.user, solicitud):
@@ -957,15 +957,17 @@ def capturar_aser(request, pk=None):
 
 
 def _contexto_aser(solicitud, formset, **extra):
-    umb = alta_servicio.umb_propuesta()
-    return {"solicitud": solicitud, "formset": formset, "datos_automaticos": {"umb": str(umb.pk) if umb else ""},
-            "sin_umb": umb is None, **extra}
+    tipo = alta_servicio.tipo_propuesto()
+    umbs = alta_servicio.umbs_por_tipo()
+    return {"solicitud": solicitud, "formset": formset, "sin_umb": not umbs, **extra,
+            "datos_automaticos": {"umbPorTipo": umbs, "tipo": str(tipo.pk) if tipo else ""}}
 
 
 def _corregir_aser(request, solicitud, editables):
     es_solicitante = solicitud.solicitante_id == request.user.pk
     puede_reenviar = es_solicitante and any(p.estado == Partida.Estado.DEVUELTA_SOL for p in editables)
-    iniciales = [{"pid": p.pk, "numero": p.numero, "descripcion": p.servicio.descripcion, "umb": p.servicio.umb_id,
+    iniciales = [{"pid": p.pk, "numero": p.numero, "tipo_material": p.servicio.tipo_material_id,
+                  "descripcion": p.servicio.descripcion, "umb": p.servicio.umb_id,
                   "grupo_articulos": p.servicio.grupo_articulos_id} for p in editables]
     if request.method == "POST":
         formset = alta_servicio.ServicioCorreccionFormSet(request.POST, initial=iniciales)

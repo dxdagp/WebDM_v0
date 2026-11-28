@@ -2,9 +2,10 @@
 
 Lo que definió Dave (28-nov-2026):
 
-    Captura:  Partida | Descripción | UMB | Grupo de artículos | Estado
-              El tipo de material es siempre ZSA. Sin Centro (los servicios no tienen) y sin imágenes.
-              La UMB se propone: la predeterminada del tipo ZSA (catálogo de tipos de material, en ADMIN).
+    Captura:  Partida | Tipo de servicio | Descripción | UMB | Grupo de artículos | Estado
+              Sin Centro (los servicios no tienen) y sin imágenes.
+              El tipo de servicio (ZRA o ZSA) viene del catálogo de tipos de material, y de él depende la
+              UMB que se propone: la predeterminada de ese tipo (ADMIN la define en Tipos de material).
 
     Reglas, iguales que las del alta de materiales: descripción en MAYÚSCULAS y sin acentos (la Ñ se
     queda), máximo 40; UMB y grupo de artículos contra sus catálogos; duplicados contra el catálogo
@@ -20,7 +21,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from catalogo_sap.models import MaterialSAP
-from catalogos.models import GrupoArticulos, TipoMaterial, UMB
+from catalogos.models import GrupoArticulos, TipoMaterial, UMB  # noqa: F401
 
 from . import duplicados
 from .folios import siguiente_folio
@@ -29,20 +30,30 @@ from .models import DetalleServicio, Evento, Flujo, Partida, Solicitud
 from .rapido import FormsetCompartido, compartir_catalogos
 
 E = Partida.Estado
-TIPO = "ZSA"
+TIPO_PROPUESTO = "ZSA"  # el tipo con el que nacen los renglones nuevos; se puede cambiar por ZRA
 NOMBRE_TXT = "Alta_Ser.txt"
-CAMPOS = ["descripcion", "umb", "grupo_articulos"]
-NOMBRES = {"descripcion": "Descripción", "umb": "UMB", "grupo_articulos": "Grupo de artículos"}
+CAMPOS = ["tipo_material", "descripcion", "umb", "grupo_articulos"]
+NOMBRES = {"tipo_material": "Tipo de servicio", "descripcion": "Descripción", "umb": "UMB", "grupo_articulos": "Grupo de artículos"}
 
 
-def umb_propuesta():
-    """La UMB predeterminada del tipo ZSA, o None si ADMIN aún no la define."""
-    tipo = TipoMaterial.objects.filter(codigo=TIPO).select_related("umb_predeterminada").first()
-    return tipo.umb_predeterminada if tipo and tipo.umb_predeterminada and tipo.umb_predeterminada.activo else None
+def umb_de(tipo):
+    """La UMB predeterminada de un tipo de servicio, o None si ADMIN no la definió (o está inactiva)."""
+    umb = getattr(tipo, "umb_predeterminada", None)
+    return umb if umb is not None and umb.activo else None
+
+
+def umbs_por_tipo():
+    """{id de tipo: id de UMB predeterminada}: lo que usa la pantalla para proponer al cambiar el tipo."""
+    return {str(t.pk): str(t.umb_predeterminada_id) for t in TipoMaterial.objects.filter(activo=True, umb_predeterminada__activo=True)}
+
+
+def tipo_propuesto():
+    return TipoMaterial.objects.filter(codigo=TIPO_PROPUESTO, activo=True).select_related("umb_predeterminada").first()
 
 
 class ServicioForm(forms.Form):
     numero = forms.IntegerField(min_value=1, required=False, label="Partida")
+    tipo_material = Catalogo(TipoMaterial.objects.select_related("umb_predeterminada"), label="Tipo de servicio")
     descripcion = CampoTextoSAP(label="Descripción")
     umb = Catalogo(UMB.objects.all(), label="UMB")
     grupo_articulos = Catalogo(GrupoArticulos.objects.all(), label="Grupo de artículos")
@@ -56,7 +67,7 @@ class ServicioForm(forms.Form):
     @property
     def vacio(self):
         datos = getattr(self, "cleaned_data", {})
-        # La UMB sola no cuenta: los renglones nuevos ya traen la propuesta.
+        # Tipo y UMB solos no cuentan: los renglones nuevos ya los traen propuestos.
         return all(datos.get(c) in (None, "") for c in ("descripcion", "grupo_articulos"))
 
     def clean(self):
@@ -66,14 +77,10 @@ class ServicioForm(forms.Form):
         return datos
 
     def faltantes(self):
-        """Obligatorios vacíos. La UMB vacía no falta si hay propuesta: se guarda la predeterminada."""
+        """Obligatorios vacíos. La UMB vacía no falta si su tipo tiene predeterminada: se guarda esa."""
         vacios = [c for c in CAMPOS if self.cleaned_data.get(c) in (None, "")]
-        if "umb" in vacios:
-            c = self.compartido if self.compartido is not None else {}
-            if "_umb" not in c:
-                c["_umb"] = umb_propuesta()  # una consulta por tabla, no por renglón
-            if c["_umb"] is not None:
-                vacios.remove("umb")
+        if "umb" in vacios and umb_de(self.cleaned_data.get("tipo_material")) is not None:
+            vacios.remove("umb")
         return vacios
 
 
@@ -154,22 +161,25 @@ ServicioCorreccionFormSet = forms.formset_factory(
 
 def filas_iniciales(solicitud):
     return [
-        {"numero": p.numero, "descripcion": p.servicio.descripcion, "umb": p.servicio.umb_id,
-         "grupo_articulos": p.servicio.grupo_articulos_id}
+        {"numero": p.numero, "tipo_material": p.servicio.tipo_material_id, "descripcion": p.servicio.descripcion,
+         "umb": p.servicio.umb_id, "grupo_articulos": p.servicio.grupo_articulos_id}
         for p in solicitud.partidas.select_related("servicio").order_by("numero")
     ]
 
 
 def filas_nuevas(cuantas=5):
-    """Renglones vacíos (10 a 50) con la UMB ya propuesta."""
-    umb = umb_propuesta()
-    return [{"numero": n, "umb": umb.pk if umb else None} for n in range(10, 10 * cuantas + 10, 10)]
+    """Renglones vacíos (10 a 50) con el tipo ZSA y su UMB ya propuestos."""
+    tipo = tipo_propuesto()
+    umb = umb_de(tipo)
+    return [{"numero": n, "tipo_material": tipo.pk if tipo else None, "umb": umb.pk if umb else None}
+            for n in range(10, 10 * cuantas + 10, 10)]
 
 
-def _guardar_detalle(partida, datos, umb_default):
+def _guardar_detalle(partida, datos):
     detalle = getattr(partida, "servicio", None) or DetalleServicio(partida=partida)
+    detalle.tipo_material = datos.get("tipo_material")
     detalle.descripcion = datos.get("descripcion") or ""
-    detalle.umb = datos.get("umb") or umb_default  # vacía = la propuesta del tipo ZSA
+    detalle.umb = datos.get("umb") or umb_de(detalle.tipo_material)  # vacía = la predeterminada de su tipo
     detalle.grupo_articulos = datos.get("grupo_articulos")
     detalle.save()
 
@@ -179,12 +189,11 @@ def guardar_borrador(usuario, formset, solicitud=None):
     if solicitud is None:
         solicitud = Solicitud.objects.create(flujo=Flujo.ASER_ZSA, solicitante=usuario)
         Evento.objects.create(solicitud=solicitud, usuario=usuario, tipo=Evento.Tipo.CREACION)
-    umb_default = umb_propuesta()
     existentes = {p.numero: p for p in solicitud.partidas.select_related("servicio")}
     for form in formset.renglones:
         numero = form.cleaned_data["numero"]
         partida = existentes.pop(numero, None) or Partida.objects.create(solicitud=solicitud, numero=numero)
-        _guardar_detalle(partida, form.cleaned_data, umb_default)
+        _guardar_detalle(partida, form.cleaned_data)
     for sobrante in existentes.values():
         sobrante.delete()
     return solicitud
@@ -212,7 +221,7 @@ def enviar(usuario, formset, solicitud):
 def faltantes(partida):
     """Para Aprobar y Reenviar (flujo.aplicar). Los duplicados los revisa flujo.duplicado_de()."""
     d = partida.servicio
-    valores = {"descripcion": d.descripcion, "umb": d.umb_id, "grupo_articulos": d.grupo_articulos_id}
+    valores = {"tipo_material": d.tipo_material_id, "descripcion": d.descripcion, "umb": d.umb_id, "grupo_articulos": d.grupo_articulos_id}
     return [NOMBRES[c] for c in CAMPOS if valores[c] in (None, "")]
 
 
@@ -221,7 +230,7 @@ def guardar_correcciones(usuario, forms_, solicitud):
     from .servicios import partidas_editables
 
     permitidas = {p.pk: p for p in partidas_editables(usuario, solicitud).select_related("servicio").select_for_update(of=("self",))}
-    cambios, umb_default = 0, umb_propuesta()
+    cambios = 0
     for form in forms_:
         partida = permitidas.get(form.cleaned_data["pid"])
         if partida is None:
@@ -229,7 +238,7 @@ def guardar_correcciones(usuario, forms_, solicitud):
         d = partida.servicio
         for campo in CAMPOS:
             actual = getattr(d, campo)
-            nuevo = form.cleaned_data.get(campo) or (umb_default if campo == "umb" else None)
+            nuevo = form.cleaned_data.get(campo) or (umb_de(form.cleaned_data.get("tipo_material")) if campo == "umb" else None)
             if actual == nuevo or (actual in (None, "") and nuevo in (None, "")):
                 continue
             Evento.objects.create(
@@ -239,7 +248,7 @@ def guardar_correcciones(usuario, forms_, solicitud):
                          "despues": "" if nuevo is None else str(nuevo)},
             )
             cambios += 1
-        _guardar_detalle(partida, form.cleaned_data, umb_default)
+        _guardar_detalle(partida, form.cleaned_data)
     return cambios
 
 
@@ -274,7 +283,7 @@ def terminar(usuario, partida, codigo):
     d.codigo_sap = codigo
     d.save(update_fields=["codigo_sap"])
     MaterialSAP.objects.create(
-        codigo=codigo, descripcion=d.descripcion, tipo_material=TIPO, umb=d.umb.codigo if d.umb else "",
+        codigo=codigo, descripcion=d.descripcion, tipo_material=d.tipo_material.codigo if d.tipo_material else "", umb=d.umb.codigo if d.umb else "",
         grupo_articulos=d.grupo_articulos.codigo if d.grupo_articulos else "", es_servicio=True,
         origen=MaterialSAP.Origen.WEBDM, folio_origen=partida.solicitud.folio or "", partida_origen=partida,
         creado_por=usuario,

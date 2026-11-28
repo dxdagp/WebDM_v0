@@ -17,7 +17,7 @@
       {% else %}
         <div class="text-secondary small">Servicios / Crear servicios (ASER_ZSA)</div>
         <h1 class="h4 fw-bold mb-1">{% if solicitud %}Borrador ASER_ZSA{% else %}Nueva solicitud ASER_ZSA{% endif %} <span class="wd-estado align-middle">BORRADOR</span></h1>
-        <div class="text-secondary">Folio: se asigna al enviar (formato ASER_ZSA-2026-000001) · Tipo de material: ZSA</div>
+        <div class="text-secondary">Folio: se asigna al enviar (formato ASER_ZSA-2026-000001)</div>
       {% endif %}
     </div>
     <div class="d-flex gap-2">
@@ -32,11 +32,11 @@
     </div>
   </div>
 
-  {% if sin_umb %}<div class="alert alert-warning">El tipo ZSA no tiene UMB predeterminada: elige la UMB en cada renglón, o pide a ADMIN que la defina en Tipos de material.</div>{% endif %}
+  {% if sin_umb %}<div class="alert alert-warning">Ningún tipo de servicio tiene UMB predeterminada: elige la UMB en cada renglón, o pide a ADMIN que la defina en Tipos de material.</div>{% endif %}
   {% for e in formset.non_form_errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
 
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-    <span class="text-secondary">Un renglón por servicio. La UMB ya viene propuesta. Puedes pegar desde Excel: Descripción, UMB, Grupo de artículos.</span>
+    <span class="text-secondary">Un renglón por servicio. Al elegir el Tipo de servicio se propone su UMB. Puedes pegar desde Excel: Tipo, Descripción, UMB, Grupo de artículos.</span>
     {% if not correccion %}<button type="button" class="btn btn-sm btn-outline-secondary" id="agregar">+ Agregar partida</button>{% endif %}
   </div>
 
@@ -44,7 +44,7 @@
     <table class="wd-tabla wd-tabla-aser">
       <thead>
         <tr>
-          <th class="auto">Partida</th><th>Descripción</th><th>UMB</th><th>Grupo de artículos</th>
+          <th class="auto">Partida</th><th>Tipo de servicio</th><th>Descripción</th><th>UMB</th><th>Grupo de artículos</th>
           <th class="auto">Estado</th>{% if not correccion %}<th class="auto">Acción</th>{% endif %}
         </tr>
       </thead>

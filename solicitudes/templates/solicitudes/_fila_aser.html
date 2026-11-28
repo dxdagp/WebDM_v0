@@ -1,6 +1,7 @@
 {# Un renglón de la tabla ASER_ZSA: un servicio nuevo. #}
 <tr class="wd-fila">
   {% include "solicitudes/_celda.html" with campo=form.numero clase="auto" %}
+  {% include "solicitudes/_celda.html" with campo=form.tipo_material %}
   {% include "solicitudes/_celda.html" with campo=form.descripcion %}
   {% include "solicitudes/_celda.html" with campo=form.umb %}
   {% include "solicitudes/_celda.html" with campo=form.grupo_articulos %}

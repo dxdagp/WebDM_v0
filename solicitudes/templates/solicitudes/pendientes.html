@@ -78,7 +78,7 @@
             <td>—</td><td>—</td><td>desde {{ p.ampliacion.centro_origen.codigo|default:"—" }}</td>
           {% elif p.solicitud.flujo == "ASER_ZSA" %}
             {# Alta de servicio: sin Centro ni No. Parte. #}
-            <td><a class="text-reset" href="{% url 'solicitudes:partida' p.pk %}">Servicio · {{ p.servicio.descripcion }}</a></td>
+            <td><a class="text-reset" href="{% url 'solicitudes:partida' p.pk %}">Servicio {{ p.servicio.tipo_material.codigo }} · {{ p.servicio.descripcion }}</a></td>
             <td>{{ p.servicio.umb.codigo|default:"—" }}</td><td>{{ p.servicio.grupo_articulos.codigo|default:"—" }}</td><td>—</td>
           {% elif p.solicitud.flujo == "MOD_ZRA" or p.solicitud.flujo == "MOD_ZSA" %}
             {# Modificación: qué dato cambia y de qué a qué. #}
