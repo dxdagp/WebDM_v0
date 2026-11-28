@@ -166,3 +166,12 @@ MEDIA_ROOT = Path(env("DJANGO_MEDIA_ROOT", BASE_DIR / "media"))
 TEST_RUNNER = "config.test_runner.Runner"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Tamaño de las capturas (pedido de Dave, 28-nov-2026) --------------------
+# Django rechaza por seguridad un formulario con más de 1,000 campos (DATA_UPLOAD_MAX_NUMBER_FIELDS).
+# Cada partida de la tabla manda ~16 campos en AMAT y ~8 en AMPL, así que el tope real era de
+# ~60 partidas en AMAT y ~120 en AMPL. Ahora el tope es MAX_PARTIDAS por solicitud, y los límites
+# de Django se calculan a partir de él (25 campos por partida, con holgura).
+MAX_PARTIDAS = 2000
+DATA_UPLOAD_MAX_NUMBER_FIELDS = MAX_PARTIDAS * 25
+DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024  # 20 MB de texto en el formulario (los archivos no cuentan)

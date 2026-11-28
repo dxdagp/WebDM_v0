@@ -20,7 +20,7 @@ CAMPOS_DETALLE = [
 ]
 
 
-def almacen_predeterminado(centro):
+def almacen_predeterminado(centro, memo=None):
     """El almacén que se propone para un Centro: el predeterminado; si no hay, el primero
     activo por código (pedido de Dave: proponer el primer dato que aparezca).
 
@@ -29,7 +29,12 @@ def almacen_predeterminado(centro):
     """
     if not centro:
         return None
-    return Almacen.objects.filter(centro=centro, activo=True).order_by("-predeterminado", "codigo").first()
+    if memo is not None and centro.pk in memo:  # en una tabla grande: una consulta por Centro, no por renglón
+        return memo[centro.pk]
+    almacen = Almacen.objects.filter(centro=centro, activo=True).order_by("-predeterminado", "codigo").first()
+    if memo is not None:
+        memo[centro.pk] = almacen
+    return almacen
 
 
 def puede_capturar(usuario):
@@ -50,6 +55,7 @@ def _reemplazar_partidas(solicitud, formset):
     sirve, porque el CASCADE se llevaría las fotos en cada "Guardar borrador".
     """
     existentes = {p.numero: p for p in solicitud.partidas.select_related("alta")}
+    memo = {}
     for form in formset.renglones:
         datos = form.cleaned_data
         partida = existentes.pop(datos["numero"], None)
@@ -65,7 +71,7 @@ def _reemplazar_partidas(solicitud, formset):
         # Campos automáticos (no se capturan):
         detalle.tipo_material = detalle.categoria_valoracion.tipo_material if detalle.categoria_valoracion else None
         if detalle.almacen is None:  # vacío = el predeterminado del Centro
-            detalle.almacen = almacen_predeterminado(partida.centro)
+            detalle.almacen = almacen_predeterminado(partida.centro, memo)
         detalle.save()
     for sobrante in existentes.values():
         borrar_archivos_al_confirmar(sobrante.imagenes.all())
@@ -196,6 +202,7 @@ def guardar_correcciones(usuario, forms, solicitud):
     # usuario editaba alguien aprobó la partida, ya no es editable y no se toca.
     permitidas = {p.pk: p for p in partidas_editables(usuario, solicitud).select_for_update()}
     cambios = 0
+    memo = {}
     for form in forms:
         datos = form.cleaned_data
         partida = permitidas.get(datos["pid"])
@@ -206,7 +213,7 @@ def guardar_correcciones(usuario, forms, solicitud):
         nuevos["centro"] = datos.get("centro")
         # Almacén vacío = el propuesto del Centro. Se resuelve ANTES de comparar para no
         # registrar un cambio falso ("RC01 → vacío") cuando en realidad sigue igual.
-        nuevos["almacen"] = nuevos["almacen"] or almacen_predeterminado(nuevos["centro"])
+        nuevos["almacen"] = nuevos["almacen"] or almacen_predeterminado(nuevos["centro"], memo)
         for campo, nuevo in nuevos.items():
             destino = partida if campo == "centro" else alta
             actual = getattr(destino, campo)
@@ -222,7 +229,7 @@ def guardar_correcciones(usuario, forms, solicitud):
         # Tipo de Material se recalcula siempre en el servidor; el almacén vacío toma el predeterminado.
         alta.tipo_material = alta.categoria_valoracion.tipo_material if alta.categoria_valoracion else None
         if alta.almacen is None:
-            alta.almacen = almacen_predeterminado(partida.centro)
+            alta.almacen = almacen_predeterminado(partida.centro, memo)
         partida.save()
         alta.save()
     return cambios

@@ -17,7 +17,7 @@ from catalogos.models import Almacen, CategoriaValoracion, Centro, GrupoCompras,
 
 from . import ampliacion, bandejas, duplicados, flujo, imagenes, servicios
 from .forms import CorreccionFormSet, PartidaCorreccionForm, PartidasFormSet
-from .models import Flujo, ImagenPartida, Partida, Solicitud
+from .models import DetalleAlta, Flujo, ImagenPartida, Partida, Solicitud
 
 
 @login_required
@@ -57,8 +57,8 @@ def _filas_iniciales(solicitud):
     for p in solicitud.partidas.select_related("alta").order_by("numero"):
         fila = {"numero": p.numero, "centro": p.centro_id}
         for campo in servicios.CAMPOS_DETALLE:
-            valor = getattr(p.alta, campo)
-            fila[campo] = getattr(valor, "pk", valor)  # para catálogos se usa su id
+            # attname = "almacen_id" para un catálogo: se lee el id sin consultar el objeto.
+            fila[campo] = getattr(p.alta, DetalleAlta._meta.get_field(campo).attname)
         filas.append(fila)
     return filas
 
@@ -700,7 +700,7 @@ def capturar_ampl(request, pk=None):
                 solicitud = ampliacion.guardar_borrador(request.user, formset, solicitud)
             if formset.validar_para_envio():
                 for f in formset.renglones:
-                    if ampliacion.ya_ampliado(f.material, f.cleaned_data["centro"]):
+                    if ampliacion.ya_ampliado(f.material, f.cleaned_data["centro"], f.compartido):
                         messages.warning(request, f"Partida {f.cleaned_data['numero']}: el material ya existe en "
                                                   f"{f.cleaned_data['centro'].codigo}; se omitirá al enviar.")
                 messages.success(request, "Validación correcta: la solicitud está lista para enviar. Se guardó como borrador.")

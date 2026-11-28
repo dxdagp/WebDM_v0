@@ -152,7 +152,7 @@ SELECT fecha, tipo, motivo FROM solicitudes_evento WHERE tipo = 'EXCLUSION' ORDE
 
 - Enter (Validar) revisa sin enviar, en AMAT y en AMPL.
 
-En total pasan 149 pruebas.
+En total pasan 152 pruebas (incluye `test_volumen.py`: 1,200 partidas en AMAT y en AMPL, y 2,001 que deben marcar error).
 
 ## 8. Enter valida, no envía (AMAT y AMPL)
 
@@ -169,6 +169,29 @@ Validar hace lo siguiente:
 
 En AMPL, además, avisa qué renglones se omitirán por estar ya ampliados.
 
-## 9. Lo que sigue
+## 9. Capturas grandes: hasta 2,000 partidas
+
+Dave intentó subir 1,194 partidas y Django respondió *"The number of GET/POST parameters exceeded settings.DATA_UPLOAD_MAX_NUMBER_FIELDS"*.
+
+**¿Por qué?** Django, por seguridad, acepta como máximo **1,000 campos** por envío. Cada renglón manda un campo por columna (unos 16 en AMAT, 8 en AMPL), así que el tope real era de unas **60 partidas en AMAT y 120 en AMPL**.
+
+**Lo que cambió** en `config/settings.py`:
+
+```python
+MAX_PARTIDAS = 2000                                  # tope por solicitud
+DATA_UPLOAD_MAX_NUMBER_FIELDS = MAX_PARTIDAS * 25    # campos suficientes para 2,000 renglones
+DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024       # 20 MB de texto por envío
+```
+
+Y los formsets usan `max_num=absolute_max=MAX_PARTIDAS` con `validate_max=True`. Con más de 2,000 sale el mensaje *"Máximo 2000 partidas por solicitud. Divide la captura en varias solicitudes."* y no se guarda nada.
+
+**Que no tarde.** Con 1,200 renglones la pantalla tardaba unos 30 segundos. Ahora tarda unos 7. Hubo dos causas, y su arreglo está en `solicitudes/rapido.py`:
+
+1. Cada renglón consultaba sus catálogos (UMB, Almacén, Grupo de compras…) por su cuenta: más de 9,000 consultas iguales. Ahora cada catálogo se consulta **una vez** por tabla y todos los renglones comparten la lista (`compartir_catalogos`, `FormsetCompartido`). Igual con el almacén predeterminado: una consulta por Centro, no por renglón.
+2. Django dibuja cada `<option>` con una plantilla. `SelectRapido` arma el `<select>` directo en Python.
+
+Al abrir un borrador grande, la tabla se dibuja con unas 25 consultas, sin importar cuántas partidas tenga. Lo que sí crece por renglón son los `INSERT`: cada partida y su detalle se guardan.
+
+## 10. Lo que sigue
 
 Modificaciones (MOD_ZRA y MOD_ZSA), alta de servicios (ASER_ZSA) y vencimientos de 15/30 días.
