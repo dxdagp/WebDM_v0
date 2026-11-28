@@ -4,7 +4,6 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from catalogos.models import Centro
@@ -25,7 +24,8 @@ CATALOGOS = {
 }
 
 
-# Filtros de la consulta de materiales, uno por columna (pedido de Dave: todos menos Almacén y UMB).
+# Filtros de la consulta de materiales, uno por columna (pedido de Dave: todos menos Almacén, UMB,
+# Grupo de compras y CeBe; None = sin filtro).
 # (parámetro GET, búsqueda de Django sobre MaterialCentro, encabezado). El orden es el de la tabla,
 # igual que la captura AMAT_ZRA.
 COLUMNAS_MATERIALES = [
@@ -34,7 +34,7 @@ COLUMNAS_MATERIALES = [
     ("centro", "centro_id", "Centro"),
     ("descripcion", "material__descripcion__icontains", "Descripción"),
     ("umb", None, "UMB"),
-    ("grupo_compras", "grupo_compras__icontains", "Grupo de compras"),
+    ("grupo_compras", None, "Grupo de compras"),
     ("grupo_articulos", "material__grupo_articulos__icontains", "Grupo de artículos"),
     ("categoria", "categoria_valoracion__icontains", "Categoría de valoración"),
     ("ubicacion", "material__ubicacion__icontains", "Ubicación"),
@@ -45,8 +45,18 @@ COLUMNAS_MATERIALES = [
     ("anio", "material__anio_modelo", "Año modelo"),
     ("compatibilidad", "material__compatibilidad__icontains", "Compatibilidad"),
     ("almacen", None, "Almacén"),
-    ("cebe", "cebe__icontains", "CeBe"),
+    ("cebe", None, "CeBe"),
     ("origen", "material__origen", "Origen"),
+]
+
+# Servicios: mismo formato que materiales (pedido de Dave), un renglón por código y sin Centro.
+COLUMNAS_SERVICIOS = [
+    ("codigo", "codigo__startswith", "Código SAP"),
+    ("descripcion", "descripcion__icontains", "Descripción"),
+    ("tipo", "tipo_material__icontains", "Tipo de material"),
+    ("umb", None, "UMB"),
+    ("grupo_articulos", "grupo_articulos__icontains", "Grupo de artículos"),
+    ("origen", "origen", "Origen"),
 ]
 
 
@@ -68,21 +78,17 @@ def consulta(request, catalogo="materiales"):
     contexto = {"catalogo": catalogo, "titulo": datos_catalogo["titulo"], "es_servicios": datos_catalogo["servicio"],
                 "puede_importar": puede_importar(request.user), "filtros_url": _sin_pagina(request)}
     if datos_catalogo["servicio"]:
-        # Servicios: un renglón por código (no dependen de un Centro) y una búsqueda general.
-        texto = request.GET.get("q", "").strip()
+        # Servicios: un renglón por código (no dependen de un Centro).
         renglones = MaterialSAP.objects.filter(es_servicio=True).select_related("creado_por", "importacion")
-        if texto:
-            # Q(...) | Q(...) = OR en el WHERE.
-            renglones = renglones.filter(Q(codigo__startswith=texto) | Q(descripcion__icontains=texto))
-        contexto.update(q=texto, pagina=Paginator(renglones.order_by("codigo"), 50).get_page(request.GET.get("pagina")))
-        return render(request, "catalogo_sap/consulta.html", contexto)
-
-    # Materiales: un renglón por Material + Centro (pedido de Dave). La consulta parte de
-    # MaterialCentro y trae su material y su Centro con JOIN (select_related).
-    renglones = MaterialCentro.objects.filter(material__es_servicio=False).select_related(
-        "centro", "material__creado_por", "material__importacion")
+        definicion, orden = COLUMNAS_SERVICIOS, ["codigo"]
+    else:
+        # Materiales: un renglón por Material + Centro (pedido de Dave). La consulta parte de
+        # MaterialCentro y trae su material y su Centro con JOIN (select_related).
+        renglones = MaterialCentro.objects.filter(material__es_servicio=False).select_related(
+            "centro", "material__creado_por", "material__importacion")
+        definicion, orden = COLUMNAS_MATERIALES, ["material__codigo", "centro__codigo"]
     columnas, hay_filtros = [], False
-    for nombre, busqueda, titulo in COLUMNAS_MATERIALES:
+    for nombre, busqueda, titulo in definicion:
         valor = request.GET.get(nombre, "").strip()
         if busqueda and valor:
             if nombre in ("centro", "anio") and not valor.isdigit():
@@ -95,7 +101,7 @@ def consulta(request, catalogo="materiales"):
     contexto.update(
         columnas=columnas, hay_filtros=hay_filtros, centros=Centro.objects.order_by("codigo"),
         origenes=MaterialSAP.Origen.choices,
-        pagina=Paginator(renglones.order_by("material__codigo", "centro__codigo"), 50).get_page(request.GET.get("pagina")),
+        pagina=Paginator(renglones.order_by(*orden), 50).get_page(request.GET.get("pagina")),
     )
     return render(request, "catalogo_sap/consulta.html", contexto)
 

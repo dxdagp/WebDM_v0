@@ -141,6 +141,13 @@ class ImportarTests(TestCase):
         imp = self.importa("777777\tMANO DE OBRA\tMTTU\tZSA\tSER\t\t")
         self.assertIn("catálogo de servicios", self.errores(imp)[0][1])
 
+    def test_servicios_se_filtran_por_grupo_de_articulos(self):
+        self.importa_servicios("555555\tMANO DE OBRA\tZSA\tSER\tGA1", "666666\tREVISION\tZRA\tSER\tGA2")
+        u = crear_usuario("sol", "SOL_MAT")
+        self.client.force_login(u)
+        r = self.client.get(reverse("catalogo_sap:servicios"), {"grupo_articulos": "ga2"})
+        self.assertEqual([m.codigo for m in r.context["pagina"]], ["666666"])
+
     def test_mismo_codigo_en_materiales_y_servicios(self):
         # Dave: son catálogos independientes; para SAP son items diferentes.
         self.importa("500001\tACUMULADOR\tMTTU\tZRA\tPZA\t\t")
@@ -192,7 +199,7 @@ class PantallasTests(TestCase):
         importar(txt("123456\tFILTRO\tMTTU\tZRA\tPZA\t\t"), "m.txt", self.dm, "MATERIALES")
         importar(txt("555555\tMANO DE OBRA\tZSA\tSER", encabezados=ENCABEZADOS_SERVICIOS), "s.txt", self.dm, "SERVICIOS")
         self.client.force_login(self.sol)
-        r = self.client.get(reverse("catalogo_sap:consulta"), {"q": ""})
+        r = self.client.get(reverse("catalogo_sap:consulta"))
         self.assertContains(r, "123456")
         self.assertNotContains(r, "555555")
         r = self.client.get(reverse("catalogo_sap:servicios"))
@@ -275,6 +282,8 @@ class CatalogoCompletoTests(TestCase):
         r = self.client.get(url)
         self.assertNotContains(r, 'name="almacen"')  # Almacén y UMB no se filtran
         self.assertNotContains(r, 'name="umb"')
+        self.assertNotContains(r, 'name="grupo_compras"')  # ni Grupo de compras ni CeBe (Dave)
+        self.assertNotContains(r, 'name="cebe"')
 
     def test_ficha_del_material_con_imagenes_para_cualquier_usuario(self):
         m = MaterialSAP.objects.get(codigo="100001")

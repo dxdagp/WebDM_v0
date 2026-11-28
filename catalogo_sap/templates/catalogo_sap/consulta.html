@@ -9,68 +9,57 @@
   {% if puede_importar %}<a class="btn btn-outline-primary" href="{% url 'catalogo_sap:importar' %}?catalogo={% if catalogo == 'servicios' %}SERVICIOS{% else %}MATERIALES{% endif %}">Importar TXT de SAP</a>{% endif %}
 </div>
 
-{% if es_servicios %}
-<form method="get" class="d-flex flex-wrap gap-2 mb-3">
-  <input class="form-control form-control-sm" style="max-width:320px" name="q" value="{{ q }}" placeholder="Código o descripción">
-  <button class="btn btn-sm btn-outline-secondary">Buscar</button>
-  {% if q %}<a class="btn btn-sm btn-link" href="?">Limpiar</a>{% endif %}
-</form>
-<div class="wd-tabla-caja">
-  <table class="table table-sm mb-0 align-middle">
-    <thead><tr><th>Código SAP</th><th>Descripción</th><th>Tipo</th><th>UMB</th><th>Grupo art.</th><th>Origen</th></tr></thead>
-    <tbody>
-    {% for m in pagina %}
-      <tr>
-        <td class="fw-semibold">{{ m.codigo }}</td>
-        <td class="wd-libre">{{ m.descripcion }}</td>
-        <td>{{ m.tipo_material }}</td>
-        <td>{{ m.umb|default:"—" }}</td>
-        <td>{{ m.grupo_articulos|default:"—" }}</td>
-        <td class="small">{% include "catalogo_sap/_origen.html" %}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="6" class="text-secondary">No hay códigos{% if q %} con ese filtro{% endif %}.</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% else %}
-{# Materiales: un renglón por Material + Centro, todas las columnas del alta AMAT_ZRA. #}
-{# El segundo renglón del encabezado son los filtros: escribe y presiona Enter. #}
+{# Tabla tipo Excel, como la captura. El segundo renglón del encabezado son los filtros: escribe y presiona Enter. #}
 <form method="get" id="filtros" class="d-flex gap-2 mb-2">
   <button class="btn btn-sm btn-outline-secondary">Filtrar</button>
   {% if hay_filtros %}<a class="btn btn-sm btn-link" href="?">Quitar filtros</a>{% endif %}
-  <span class="small text-secondary align-self-center">Escribe en los cuadros bajo cada columna y presiona Enter. Clic en el código para ver el material completo.</span>
+  <span class="small text-secondary align-self-center">Escribe en el renglón de filtros (bajo los encabezados) y presiona Enter.{% if not es_servicios %} Clic en el código para ver el material completo.{% endif %}</span>
 </form>
 <div class="wd-tabla-caja">
-  <table class="table table-sm mb-0 align-middle wd-catalogo">
+  <table class="wd-tabla wd-catalogo">
     <thead>
       <tr>{% for c in columnas %}<th>{{ c.titulo }}</th>{% endfor %}</tr>
       <tr class="wd-filtros">
         {% for c in columnas %}<th>
           {% if c.nombre == "centro" %}
-            <select class="form-select form-select-sm" name="centro" form="filtros" onchange="this.form.submit()">
+            <select name="centro" form="filtros" onchange="this.form.submit()">
               <option value=""></option>
               {% for ce in centros %}<option value="{{ ce.pk }}"{% if c.valor == ce.pk|stringformat:"s" %} selected{% endif %}>{{ ce.codigo }}</option>{% endfor %}
             </select>
           {% elif c.nombre == "origen" %}
-            <select class="form-select form-select-sm" name="origen" form="filtros" onchange="this.form.submit()">
+            <select name="origen" form="filtros" onchange="this.form.submit()">
               <option value=""></option>
               {% for v, txt in origenes %}<option value="{{ v }}"{% if c.valor == v %} selected{% endif %}>{{ v }}</option>{% endfor %}
             </select>
           {% elif c.filtra %}
-            <input class="form-control form-control-sm" name="{{ c.nombre }}" value="{{ c.valor }}" form="filtros" aria-label="Filtrar {{ c.titulo }}"{% if c.nombre == "anio" %} inputmode="numeric"{% endif %}>
+            <input name="{{ c.nombre }}" placeholder=" " value="{{ c.valor }}" form="filtros" aria-label="Filtrar {{ c.titulo }}"{% if c.nombre == "anio" %} inputmode="numeric"{% endif %}>
           {% endif %}
         </th>{% endfor %}
       </tr>
     </thead>
+  {% if es_servicios %}
+    <tbody>
+    {% for m in pagina %}
+      <tr>
+        <td>{{ m.codigo }}</td>
+        <td>{{ m.descripcion }}</td>
+        <td>{{ m.tipo_material }}</td>
+        <td>{{ m.umb|default:"—" }}</td>
+        <td>{{ m.grupo_articulos|default:"—" }}</td>
+        <td>{% include "catalogo_sap/_origen_texto.html" %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vacia">No hay servicios{% if hay_filtros %} con esos filtros{% endif %}.</td></tr>
+    {% endfor %}
+    </tbody>
+  {% else %}
     <tbody>
     {% for mc in pagina %}{% with m=mc.material %}
       <tr>
-        <td class="fw-semibold"><a href="{% url 'catalogo_sap:material' m.pk %}">{{ m.codigo }}</a></td>
+        <td><a href="{% url 'catalogo_sap:material' m.pk %}">{{ m.codigo }}</a></td>
         <td>{{ m.tipo_material }}</td>
         <td>{{ mc.centro.codigo }}</td>
-        <td class="wd-libre">{{ m.descripcion }}</td>
+        <td>{{ m.descripcion }}</td>
         <td>{{ m.umb|default:"—" }}</td>
         <td>{{ mc.grupo_compras|default:"—" }}</td>
         <td>{{ m.grupo_articulos|default:"—" }}</td>
@@ -84,14 +73,14 @@
         <td>{{ m.compatibilidad|default:"—" }}</td>
         <td>{{ mc.almacen|default:"—" }}</td>
         <td>{{ mc.cebe|default:"—" }}</td>
-        <td class="small">{% include "catalogo_sap/_origen.html" %}</td>
+        <td>{% include "catalogo_sap/_origen_texto.html" %}</td>
       </tr>
     {% endwith %}{% empty %}
-      <tr><td colspan="18" class="text-secondary">No hay materiales{% if hay_filtros %} con esos filtros{% endif %}.</td></tr>
+      <tr><td colspan="18" class="vacia">No hay materiales{% if hay_filtros %} con esos filtros{% endif %}.</td></tr>
     {% endfor %}
     </tbody>
+  {% endif %}
   </table>
 </div>
-{% endif %}
 {% include "catalogo_sap/_paginas.html" with pagina=pagina %}
 {% endblock %}

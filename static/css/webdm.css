@@ -110,7 +110,13 @@ td.wd-error { background: #FFEBE9; }
 .wd-celda-imagenes input[type=file] { width: 190px; }
 .wd-celda-imagenes a { display: block; padding: 0 5px; }
 
-/* Fase 4b: catálogo de materiales con todas las columnas y un filtro bajo cada una. */
+/* Fase 4b: catálogo de materiales con aspecto de Excel, igual que la captura (usa .wd-tabla).
+   Ningún dato se parte en dos renglones: cada columna mide lo que su texto más largo. */
+.wd-catalogo { min-width: 0; }
 .wd-catalogo th, .wd-catalogo td { white-space: nowrap; }
-.wd-catalogo .wd-filtros th { padding: 2px; background: #FAFAFA; }
-.wd-catalogo .wd-filtros .form-control, .wd-catalogo .wd-filtros .form-select { min-width: 70px; padding: 1px 4px; font-size: 12px; border-radius: 0; }
+.wd-catalogo td { padding: 0 6px; }
+.wd-catalogo td a { color: #0563C1; }
+.wd-catalogo td.vacia { color: #595959; padding: 6px; }
+.wd-catalogo .wd-filtros th { padding: 0; background: #fff; }
+.wd-catalogo .wd-filtros input, .wd-catalogo .wd-filtros select { min-width: 60px; }
+.wd-catalogo .wd-filtros input:not(:placeholder-shown), .wd-catalogo .wd-filtros select:has(option:checked:not([value=""])) { background: #FFF9DB; }

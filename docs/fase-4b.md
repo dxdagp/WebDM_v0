@@ -176,7 +176,9 @@ La búsqueda acepta código (empieza con), descripción o No. Parte (contiene), 
 - Lo **dado de alta en WebDM** las llena todas: al terminar con código, DM copia los datos de la partida al catálogo (`flujo.terminar_con_codigos`) y guarda `partida_origen`, de donde salen las imágenes.
 - La migración `0006_llenar_materiales_webdm` llena estas columnas en los materiales que ya se habían dado de alta antes del cambio.
 
-**Filtros:** bajo cada encabezado hay un cuadro de filtro (todos menos Almacén y UMB). Escribes y presionas Enter. La lista `COLUMNAS_MATERIALES` de `views.py` dice qué búsqueda usa cada columna:
+**Aspecto:** la tabla usa la misma cuadrícula tipo Excel que la captura (`.wd-tabla`), y ningún dato se parte en dos renglones (`white-space: nowrap`): cada columna mide lo que su texto más largo y, si no cabe, la tabla se desplaza a lo ancho.
+
+**Filtros:** bajo cada encabezado hay un cuadro de filtro, menos en Almacén, UMB, Grupo de compras y CeBe. Un filtro con valor se pinta de amarillo claro. Escribes y presionas Enter. La lista `COLUMNAS_MATERIALES` de `views.py` dice qué búsqueda usa cada columna:
 
 | Columna | Búsqueda | SQL |
 | --- | --- | --- |
@@ -204,7 +206,7 @@ ORDER BY "catalogo_sap_materialsap"."codigo" ASC, "catalogos_centro"."codigo" AS
 LIMIT 50;
 ```
 
-Los **servicios** siguen con un renglón por código y una búsqueda general, porque no tienen Centro.
+Los **servicios** tienen el mismo formato (tabla tipo Excel, filtro bajo cada columna), con un renglón por código porque no tienen Centro. Se filtran por Código, Descripción, Tipo de material, Grupo de artículos y Origen (`COLUMNAS_SERVICIOS`).
 
 **Columnas nuevas (migración 0005):**
 
@@ -256,9 +258,9 @@ GROUP BY mensaje ORDER BY 2 DESC;
 - Permisos.
 - La consulta separa materiales y servicios.
 - Materiales: un renglón por Material + Centro.
-- El alta en WebDM llena todas las columnas; filtros por columna (sin Almacén ni UMB); ficha del material con imágenes visible para cualquier usuario.
+- El alta en WebDM llena todas las columnas; filtros por columna (sin Almacén, UMB, Grupo de compras ni CeBe); ficha del material con imágenes visible para cualquier usuario.
 
-En total pasan 127 pruebas.
+En total pasan 128 pruebas.
 
 ## 7. Pendiente para la fase 5
 
