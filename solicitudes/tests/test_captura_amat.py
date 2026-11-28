@@ -199,3 +199,27 @@ class ImagenesDesdeLaCapturaTests(BaseCaptura):
         r = self.post("guardar", filas)
         self.assertContains(r, "no es una imagen válida")
         self.assertFalse(Solicitud.objects.exists())
+
+
+class BorradorVacioTests(BaseCaptura):
+    """Pedido de Dave: un borrador al que le quitas todas las partidas no se queda vacío."""
+
+    def test_guardar_sin_partidas_elimina_el_borrador(self):
+        solicitud = self.borrador_con_imagenes(self.fila())
+        r = self.post("guardar", self.fila(i=0, numero="", centro="", descripcion="", ubicacion="", no_parte_original="",
+                                           tipo_unidad="", marca="", version="", anio_modelo="", umb="",
+                                           grupo_articulos="", categoria_valoracion="", grupo_compras=""),
+                      solicitud=solicitud)
+        self.assertRedirects(r, reverse("solicitudes:mis_solicitudes"), fetch_redirect_response=False)
+        self.assertFalse(Solicitud.objects.exists())
+        self.assertFalse(ImagenPartida.objects.exists())
+
+    def test_boton_eliminar_borrador(self):
+        solicitud = self.borrador_con_imagenes(self.fila())
+        self.post("eliminar", self.fila(), solicitud=solicitud)
+        self.assertFalse(Solicitud.objects.exists())
+
+    def test_enviar_sin_partidas_no_crea_nada(self):
+        r = self.post("enviar")
+        self.assertContains(r, "Agrega al menos una partida")
+        self.assertFalse(Solicitud.objects.exists())

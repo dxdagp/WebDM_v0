@@ -12,7 +12,7 @@ from catalogos.models import Almacen
 
 from . import duplicados
 from .folios import siguiente_folio
-from .models import DetalleAlta, Evento, Flujo, Partida, Solicitud
+from .models import DetalleAlta, Evento, Flujo, ImagenPartida, Partida, Solicitud
 
 CAMPOS_DETALLE = [
     "descripcion", "ubicacion", "no_parte_original", "tipo_unidad", "marca", "version", "anio_modelo",
@@ -60,6 +60,16 @@ def _reemplazar_partidas(solicitud, formset):
     for sobrante in existentes.values():
         borrar_archivos_al_confirmar(sobrante.imagenes.all())
         sobrante.delete()  # CASCADE borra su DetalleAlta y los renglones de sus imágenes
+
+
+@transaction.atomic
+def eliminar_borrador(solicitud):
+    """Borra un BORRADOR completo: cabecera, partidas, detalle, eventos e imágenes.
+    Solo BORRADOR: lo que ya entró al flujo nunca se borra (se cancela)."""
+    if solicitud.estado != Solicitud.Estado.BORRADOR:
+        raise ValueError("Solo se puede eliminar un borrador.")
+    borrar_archivos_al_confirmar(ImagenPartida.objects.filter(partida__solicitud=solicitud))
+    solicitud.delete()  # CASCADE: partidas, DetalleAlta, ImagenPartida y Evento
 
 
 def borrar_archivos_al_confirmar(imagenes):

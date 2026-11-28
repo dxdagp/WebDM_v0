@@ -77,7 +77,18 @@ def capturar_amat(request, pk=None):
         formset = PartidasFormSet(request.POST, centros=centros)
         accion = request.POST.get("accion")
         hay_archivos = bool(request.FILES)
-        if not formset.is_valid():
+        if accion == "eliminar" or (formset.is_valid() and not formset.renglones and accion != "enviar"):
+            # Un borrador sin partidas no sirve de nada: se elimina en vez de quedar vacío
+            # en "Mis solicitudes" (Revisión 3: lo que nunca entró al flujo puede eliminarse).
+            if solicitud is not None:
+                servicios.eliminar_borrador(solicitud)
+                messages.success(request, "Borrador eliminado.")
+            else:
+                messages.info(request, "No había partidas; no se guardó nada.")
+            return redirect("solicitudes:mis_solicitudes")
+        if accion == "enviar" and formset.is_valid() and not formset.renglones:
+            messages.error(request, "Agrega al menos una partida antes de enviar.")
+        elif not formset.is_valid():
             aviso = " Vuelve a elegir las imágenes: el navegador no las conserva." if hay_archivos else ""
             messages.error(request, "Hay valores inválidos; no se guardó nada. Corrige las celdas marcadas." + aviso)
         else:
