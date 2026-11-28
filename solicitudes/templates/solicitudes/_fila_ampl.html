@@ -1,9 +1,9 @@
-{# Un renglón de la tabla AMPL_ZRA (captura y corrección). Orden de Dave: Material, Centro nuevo, #}
+{# Un renglón de la tabla AMPL_ZRA (captura y corrección). Orden de Dave: Descripción (automática, a la izquierda), Material, Centro nuevo, #}
 {# Almacén nuevo, Centro modelo, Almacén modelo; luego Planificador y Grupo de compras (propuestos) y CeBe. #}
 <tr class="wd-fila">
   {% include "solicitudes/_celda.html" with campo=form.numero clase="auto" %}
-  {% include "solicitudes/_celda.html" with campo=form.codigo_sap %}
   <td class="auto" data-auto="descripcion">—</td>
+  {% include "solicitudes/_celda.html" with campo=form.codigo_sap %}
   {% include "solicitudes/_celda.html" with campo=form.centro %}
   {% include "solicitudes/_celda.html" with campo=form.almacen_destino %}
   {% include "solicitudes/_celda.html" with campo=form.centro_origen %}
