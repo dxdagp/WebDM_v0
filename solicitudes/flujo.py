@@ -223,7 +223,8 @@ class ErroresCodigo(Exception):
 def _error_codigo(codigo):
     if not (len(codigo) == 6 and codigo.isdigit()):
         return "Debe tener exactamente 6 dígitos."
-    if MaterialSAP.objects.filter(codigo=codigo).exists() or DetalleAlta.objects.filter(codigo_sap=codigo).exists():
+    # Solo contra el catálogo de MATERIALES: un servicio con el mismo código es otro item.
+    if MaterialSAP.objects.filter(codigo=codigo, es_servicio=False).exists() or DetalleAlta.objects.filter(codigo_sap=codigo).exists():
         return "Este Código SAP ya existe."
     return None
 
@@ -275,9 +276,19 @@ def terminar_con_codigos(usuario, codigos):
                 codigo=alta.codigo_sap, descripcion=alta.descripcion,
                 tipo_material=alta.tipo_material.codigo if alta.tipo_material else "",
                 umb=alta.umb.codigo if alta.umb else "", no_parte_original=alta.no_parte_original,
-                origen=MaterialSAP.Origen.WEBDM, folio_origen=p.solicitud.folio or "", creado_por=usuario,
+                grupo_articulos=alta.grupo_articulos.codigo if alta.grupo_articulos else "",
+                ubicacion=alta.ubicacion.codigo if alta.ubicacion else "", tipo_unidad=alta.tipo_unidad,
+                marca=alta.marca, version=alta.version, anio_modelo=alta.anio_modelo,
+                compatibilidad=alta.compatibilidad,
+                origen=MaterialSAP.Origen.WEBDM, folio_origen=p.solicitud.folio or "", partida_origen=p,
+                creado_por=usuario,
             )
-            MaterialCentro.objects.create(material=material, centro=p.centro)
+            MaterialCentro.objects.create(
+                material=material, centro=p.centro, cebe=p.centro.centro_beneficio if p.centro else "",
+                grupo_compras=alta.grupo_compras.codigo if alta.grupo_compras else "",
+                categoria_valoracion=alta.categoria_valoracion.codigo if alta.categoria_valoracion else "",
+                almacen=alta.almacen.codigo if alta.almacen else "",
+            )
             anterior = p.estado
             p.estado = E.TERMINADA
             p.save(update_fields=["estado", "actualizada"])
@@ -314,7 +325,7 @@ def corregir_codigo(usuario, partida_id, nuevo, motivo):
     anterior = alta.codigo_sap
     try:
         # Se cambia el código del MISMO material: su id no cambia, así que sus Centros se conservan.
-        MaterialSAP.objects.filter(codigo=anterior).update(codigo=nuevo)
+        MaterialSAP.objects.filter(codigo=anterior, es_servicio=False).update(codigo=nuevo)
         alta.codigo_sap = nuevo
         alta.save(update_fields=["codigo_sap"])
     except IntegrityError:

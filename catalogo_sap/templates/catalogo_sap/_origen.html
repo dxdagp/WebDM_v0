@@ -1,0 +1,2 @@
+{% if m.origen == "IMPORT" %}<span class="badge text-bg-info">IMPORT</span> {{ m.creado_por }}{% if m.importacion %} · {{ m.importacion.fecha|date:"d/m/Y" }}{% endif %}
+{% else %}<span class="badge text-bg-success">WEBDM</span> {{ m.folio_origen }}{% endif %}

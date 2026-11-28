@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block titulo %}Importar catálogo SAP · WebDM{% endblock %}
+{% block contenido %}
+<div class="mb-3">
+  <div class="text-secondary small">Administración / Importar catálogo SAP</div>
+  <h1 class="h4 fw-bold mb-0">Importar catálogo SAP</h1>
+</div>
+
+<section class="wd-ficha mb-4">
+  <form method="post" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center mb-3"
+        onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Importando…';">
+    {% csrf_token %}
+    <span class="fw-semibold">Catálogo:</span>
+    {% for valor, etiqueta in catalogos %}
+      <label class="form-check-label me-2"><input class="form-check-input me-1" type="radio" name="catalogo" value="{{ valor }}" required{% if elegido == valor %} checked{% endif %}>{{ etiqueta }}</label>
+    {% endfor %}
+    <input class="form-control w-auto" type="file" name="archivo" accept=".txt,.tsv,text/plain" required>
+    <button class="btn btn-primary">Importar</button>
+  </form>
+  <div class="small text-secondary">
+    <p class="mb-1"><strong>Formato:</strong> .txt separado por tabuladores, en UTF-8, con renglón de encabezados. Las columnas pueden ir en cualquier orden.</p>
+    <p class="mb-1"><strong>Materiales</strong> (un renglón por material y Centro; tipo ZRA): <code>{{ columnas.MATERIALES.obligatorias|join:" · " }}</code>. Opcional: <code>NO_PARTE_ORIGINAL</code>.</p>
+    <p class="mb-1"><strong>Servicios</strong> (un renglón por servicio, sin Centro; tipo ZRA o ZSA): <code>{{ columnas.SERVICIOS.obligatorias|join:" · " }}</code>.</p>
+    <p class="mb-1">Los dos catálogos son independientes: un mismo código puede existir como material y como servicio.</p>
+    <p class="mb-0">Los renglones buenos se importan aunque otros tengan error. Cada valor se valida contra los catálogos de WebDM (el CeBe debe ser el del Centro). Si el Material + Centro ya existe, ese renglón no se carga; un material existente sí se puede cargar en otro Centro. Un código tiene una sola descripción y un solo grupo de artículos: si vienen distintos, no se importa ninguno de sus renglones.</p>
+  </div>
+</section>
+
+<h2 class="h6 fw-bold">Historial</h2>
+<div class="wd-tabla-caja">
+  <table class="table table-sm mb-0 align-middle">
+    <thead><tr><th>Fecha</th><th>Catálogo</th><th>Usuario</th><th>Archivo</th><th>Importados</th><th>Con error</th><th></th></tr></thead>
+    <tbody>
+    {% for imp in historial %}
+      <tr>
+        <td>{{ imp.fecha|date:"d/m/Y H:i" }}</td><td>{{ imp.get_catalogo_display }}</td><td>{{ imp.usuario }}</td><td class="wd-libre">{{ imp.nombre_archivo }}</td>
+        <td>{{ imp.importados }}</td><td>{% if imp.errores %}<span class="text-danger fw-semibold">{{ imp.errores }}</span>{% else %}0{% endif %}</td>
+        <td><a href="{% url 'catalogo_sap:importacion' imp.pk %}">Ver</a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-secondary">Aún no hay importaciones.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

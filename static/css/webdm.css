@@ -109,3 +109,20 @@ td.wd-error { background: #FFEBE9; }
 .wd-lupa { display: none; position: absolute; width: 220px; height: 220px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 16px rgba(0,0,0,.45); background-repeat: no-repeat; pointer-events: none; }
 .wd-celda-imagenes input[type=file] { width: 190px; }
 .wd-celda-imagenes a { display: block; padding: 0 5px; }
+
+/* Fase 4b: catálogo de materiales con aspecto de Excel, igual que la captura (usa .wd-tabla).
+   Ningún dato se parte en dos renglones: cada columna mide lo que su texto más largo. */
+.wd-catalogo { min-width: 0; }
+.wd-catalogo th, .wd-catalogo td { white-space: nowrap; }
+.wd-catalogo td { padding: 0 6px; }
+.wd-catalogo td a { color: #0563C1; }
+.wd-catalogo td.vacia { color: #595959; padding: 6px; }
+.wd-catalogo .wd-filtros th { padding: 0; background: #fff; }
+.wd-catalogo .wd-filtros input, .wd-catalogo .wd-filtros select { min-width: 60px; }
+.wd-catalogo .wd-filtros input:not(:placeholder-shown), .wd-catalogo .wd-filtros select:has(option:checked:not([value=""])) { background: #FFF9DB; }
+.wd-exportar { position: relative; }
+.wd-exportar summary { list-style: none; }
+.wd-exportar summary::-webkit-details-marker { display: none; }
+.wd-exportar-menu { position: absolute; z-index: 20; top: 100%; left: 0; margin-top: 2px; min-width: 250px; background: #fff; border: 1px solid #BFBFBF; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+.wd-exportar-menu a, .wd-exportar-menu button { display: block; width: 100%; padding: 6px 10px; border: 0; background: none; text-align: left; color: #000; text-decoration: none; font-size: 13px; }
+.wd-exportar-menu a:hover, .wd-exportar-menu button:hover { background: #E8F3EC; }

@@ -1,0 +1,11 @@
+{# Visor de imágenes: un solo cuadro que el JavaScript llena con la imagen elegida. #}
+<div class="wd-visor" id="visor" hidden role="dialog" aria-modal="true" aria-label="Imagen ampliada">
+  <div class="wd-visor-caja">
+    <a class="wd-visor-boton wd-visor-descargar" href="#" download aria-label="Descargar imagen" title="Descargar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+    </a>
+    <button type="button" class="wd-visor-boton wd-visor-cerrar" aria-label="Cerrar" title="Cerrar">&times;</button>
+    <img alt="" title="Clic para abrir en tamaño completo en otra pestaña">
+    <div class="wd-lupa" aria-hidden="true"></div>
+  </div>
+</div>

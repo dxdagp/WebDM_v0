@@ -10,6 +10,7 @@ from usuarios.views import CambiarPassword
 urlpatterns = [
     path("", inicio, name="inicio"),
     path("solicitudes/", include("solicitudes.urls")),
+    path("catalogo-sap/", include("catalogo_sap.urls")),
     # Vistas de inicio y cierre de sesión que ya trae Django.
     path("login/", auth_views.LoginView.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),

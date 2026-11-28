@@ -1,0 +1,1 @@
+{{ m.origen }} · {% if m.origen == "IMPORT" %}{{ m.creado_por }}{% if m.importacion %} · {{ m.importacion.fecha|date:"d/m/Y" }}{% endif %}{% else %}{{ m.folio_origen }}{% endif %}

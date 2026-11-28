@@ -21,9 +21,10 @@ OPCIONES = [
     ("Materiales", "Modificar materiales", None, {"SOL_MAT", "VAL_MAT"}),
     ("Servicios", "Crear servicios", None, {"SOL_MAT", "VAL_MAT"}),
     ("Servicios", "Modificar servicios", None, {"SOL_MAT", "VAL_MAT"}),
-    ("Consulta", "Catálogo SAP", None, {"SOL_MAT", "VAL_MAT", "DM", "ADMIN"}),
+    ("Consulta", "Catálogo de materiales", "catalogo_sap:consulta", {"SOL_MAT", "VAL_MAT", "DM", "ADMIN"}),
+    ("Consulta", "Catálogo de servicios", "catalogo_sap:servicios", {"SOL_MAT", "VAL_MAT", "DM", "ADMIN"}),
     ("Administración", "Usuarios, roles y catálogos", "admin:index", {"ADMIN"}),
-    ("Administración", "Importar catálogo SAP", None, {"ADMIN"}),
+    ("Administración", "Importar catálogo SAP", "catalogo_sap:importar", {"ADMIN", "DM"}),
 ]
 
 
