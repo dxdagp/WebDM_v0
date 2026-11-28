@@ -30,7 +30,7 @@ def consulta(request, catalogo="materiales"):
     """Catálogo de consulta global (Revisión 3: todos ven todos los Centros).
 
     Materiales y servicios se consultan por separado (pedido de Dave). Por dentro es la misma
-    tabla con la columna es_servicio: así un código nunca puede estar en los dos.
+    tabla con la columna es_servicio; el código es único dentro de cada catálogo, no entre los dos.
     """
     datos_catalogo = CATALOGOS[catalogo]
     texto = request.GET.get("q", "").strip()

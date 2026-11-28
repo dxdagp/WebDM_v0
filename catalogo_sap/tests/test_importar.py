@@ -74,6 +74,16 @@ class ImportarTests(TestCase):
         imp = self.importa("777777\tMANO DE OBRA\tMTTU\tZSA\tSER\t\t")
         self.assertIn("catálogo de servicios", self.errores(imp)[0][1])
 
+    def test_mismo_codigo_en_materiales_y_servicios(self):
+        # Dave: son catálogos independientes; para SAP son items diferentes.
+        self.importa("500001\tACUMULADOR\tMTTU\tZRA\tPZA\t\t")
+        imp = self.importa("500001\tSERVICIO DE MUELLES\tMTTU\tZRA\tSER\t\t", catalogo="SERVICIOS")
+        self.assertEqual((imp.importados, imp.errores), (1, 0))
+        self.assertEqual(MaterialSAP.objects.filter(codigo="500001").count(), 2)
+        # Pero dentro del mismo catálogo sigue siendo único.
+        imp = self.importa("500001\tOTRO SERVICIO\tMEIX\tZRA\tSER\t\t", catalogo="SERVICIOS")
+        self.assertEqual(imp.errores, 1)
+
     def test_bom_y_columnas_en_otro_orden(self):
         datos = "﻿UMB\tCENTRO\tCODIGO_SAP\tTIPO_MATERIAL\tDESCRIPCION\nPZA\tMTTU\t123456\tZRA\tÑandú\n"
         imp = importar(BytesIO(datos.encode("utf-8")), "a.txt", self.dm)

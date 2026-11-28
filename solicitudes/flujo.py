@@ -223,7 +223,8 @@ class ErroresCodigo(Exception):
 def _error_codigo(codigo):
     if not (len(codigo) == 6 and codigo.isdigit()):
         return "Debe tener exactamente 6 dígitos."
-    if MaterialSAP.objects.filter(codigo=codigo).exists() or DetalleAlta.objects.filter(codigo_sap=codigo).exists():
+    # Solo contra el catálogo de MATERIALES: un servicio con el mismo código es otro item.
+    if MaterialSAP.objects.filter(codigo=codigo, es_servicio=False).exists() or DetalleAlta.objects.filter(codigo_sap=codigo).exists():
         return "Este Código SAP ya existe."
     return None
 
@@ -314,7 +315,7 @@ def corregir_codigo(usuario, partida_id, nuevo, motivo):
     anterior = alta.codigo_sap
     try:
         # Se cambia el código del MISMO material: su id no cambia, así que sus Centros se conservan.
-        MaterialSAP.objects.filter(codigo=anterior).update(codigo=nuevo)
+        MaterialSAP.objects.filter(codigo=anterior, es_servicio=False).update(codigo=nuevo)
         alta.codigo_sap = nuevo
         alta.save(update_fields=["codigo_sap"])
     except IntegrityError:

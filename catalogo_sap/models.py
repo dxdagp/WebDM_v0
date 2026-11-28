@@ -23,7 +23,7 @@ class MaterialSAP(models.Model):
         IMPORT = "IMPORT", "Importado de SAP"
         WEBDM = "WEBDM", "Alta en WebDM"
 
-    codigo = models.CharField("Código SAP", max_length=6, unique=True, validators=[validar_codigo_sap])
+    codigo = models.CharField("Código SAP", max_length=6, validators=[validar_codigo_sap])
     descripcion = models.CharField("descripción", max_length=40)
     # Texto y no llave foránea: el TXT de SAP puede traer tipos o UMB que aún
     # no existen en los catálogos de WebDM, y la importación no debe fallar por eso.
@@ -44,6 +44,9 @@ class MaterialSAP(models.Model):
         constraints = [
             # `codigo ~ '^\d{6}$'` en SQL: el operador ~ de PostgreSQL compara con una expresión regular.
             models.CheckConstraint(condition=Q(codigo__regex=r"^\d{6}$"), name="materialsap_codigo_6_digitos"),
+            # Materiales y servicios son catálogos independientes (Dave, 28-nov-2026): el mismo
+            # código puede existir como material ZRA y como servicio. Único DENTRO de cada catálogo.
+            models.UniqueConstraint(fields=["codigo", "es_servicio"], name="materialsap_codigo_unico_por_catalogo"),
         ]
 
     def __str__(self):

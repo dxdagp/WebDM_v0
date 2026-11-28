@@ -5,7 +5,7 @@ Revisión 3, secciones 12 y 17.1, con las decisiones de Dave del 28-nov-2026:
 | Decisión | Cómo quedó |
 | --- | --- |
 | Quién importa | ADMIN y DM |
-| Materiales y servicios | **Catálogos separados**: se importan, consultan y (después) reportan por separado. Materiales son ZRA; servicios pueden ser ZRA o ZSA. |
+| Materiales y servicios | **Catálogos separados e independientes**: se importan, consultan y (después) reportan por separado. Materiales son ZRA; servicios pueden ser ZRA o ZSA. El mismo código puede existir en los dos (material 500001 ACUMULADOR y servicio 500001 SERVICIO DE MUELLES). |
 | Mismo código con descripciones distintas | No se importa **ninguno** de sus renglones |
 | Normalización | Igual que la captura: mayúsculas, sin acentos, conserva la Ñ |
 | Tamaño del archivo | Sin límite: se lee renglón por renglón |
@@ -18,7 +18,7 @@ cd C:\proyectos\WebDM_v0
 git fetch origin
 git checkout fase-4b
 git pull
-python manage.py migrate      # agrega la columna "catalogo" a las importaciones
+python manage.py migrate      # columna "catalogo" en importaciones y código único por catálogo
 python manage.py test
 python manage.py runserver
 ```
@@ -41,11 +41,19 @@ Las columnas pueden venir en cualquier orden. Las que no conozco se ignoran.
 
 ## 2. Un catálogo por dentro, dos por fuera
 
-Para Dave son dos catálogos distintos. En la base es **una sola tabla** (`catalogo_sap_materialsap`) con la columna `es_servicio`:
+Para Dave son dos catálogos distintos e independientes. En la base es **una sola tabla** (`catalogo_sap_materialsap`) con la columna `es_servicio`:
 
-- En SAP, un servicio ZRA/ZSA también es un número de material. Una sola tabla con `codigo UNIQUE` garantiza que un mismo código nunca exista como material **y** como servicio.
-- Las pantallas filtran: `WHERE es_servicio = false` para materiales y `= true` para servicios.
-- La búsqueda de duplicados de AMAT_ZRA solo compara contra materiales.
+- Las pantallas filtran con `WHERE es_servicio = false` para materiales y `= true` para servicios.
+- El código es único **dentro de cada catálogo**, no entre los dos. Por eso la restricción es sobre el par de columnas:
+
+```sql
+ALTER TABLE "catalogo_sap_materialsap" DROP CONSTRAINT "catalogo_sap_materialsap_codigo_key";
+ALTER TABLE "catalogo_sap_materialsap"
+  ADD CONSTRAINT "materialsap_codigo_unico_por_catalogo" UNIQUE ("codigo", "es_servicio");
+```
+
+  Así puede existir `('500001', false)`, el material ACUMULADOR, y `('500001', true)`, el servicio SERVICIO DE MUELLES, pero no dos materiales 500001.
+- La búsqueda de duplicados de AMAT_ZRA, el Código SAP que captura DM y su corrección solo miran el catálogo de **materiales**.
 
 Cada importación guarda a qué catálogo fue (`Importacion.catalogo`). La migración:
 
@@ -152,6 +160,7 @@ GROUP BY mensaje ORDER BY 2 DESC;
 - Cada tipo de error, con su línea.
 - Descripción distinta: no se sube ninguno.
 - Código ya existente.
+- El mismo código en materiales y en servicios.
 - Catálogo de servicios y ZSA en materiales.
 - BOM y columnas en otro orden.
 - Archivo que no está en UTF-8.
@@ -159,7 +168,7 @@ GROUP BY mensaje ORDER BY 2 DESC;
 - Permisos.
 - La consulta separa materiales y servicios.
 
-En total pasan 117 pruebas.
+En total pasan 118 pruebas.
 
 ## 7. Pendiente para la fase 5
 

@@ -13,7 +13,8 @@ Reglas (confirmadas por Dave el 28-nov-2026):
 - Si un código trae descripciones distintas en sus renglones: no se importa NINGUNO de sus renglones.
 - Materiales y servicios son catálogos SEPARADOS: quien importa elige a cuál va el archivo.
   Materiales son ZRA; servicios pueden ser ZRA o ZSA. Un ZSA en el archivo de materiales es error.
-- Los códigos son únicos entre los dos catálogos (en SAP son el mismo número de material).
+- Los catálogos son independientes: el mismo código puede ser un material y un servicio distintos
+  (ej. material 500001 ACUMULADOR y servicio 500001 SERVICIO DE MUELLES). Único dentro de cada catálogo.
 - Sin límite de tamaño: el archivo se lee renglón por renglón, no completo en memoria.
 
 Tres pasos:
@@ -118,7 +119,7 @@ def _validar_renglones(lector, indice, centros, existentes, servicios):
         elif not servicios and tipo in TIPOS_SOLO_SERVICIO:
             mensaje = f"{tipo} es de servicios; impórtalo en el catálogo de servicios."
         elif codigo in existentes:
-            mensaje = "El código ya existía en WebDM antes de esta importación (en materiales o en servicios). Para otro Centro usa AMPL_ZRA."
+            mensaje = "El código ya existía en este catálogo antes de esta importación. Para otro Centro usa AMPL_ZRA."
         else:
             resultado.buenos.append(Renglon(linea, codigo, descripcion, centros[centro_txt], tipo, umb, no_parte))
             continue
@@ -160,10 +161,10 @@ def importar(archivo, nombre, usuario, catalogo=Importacion.Catalogo.MATERIALES)
     centros = {c.codigo.upper(): c for c in Centro.objects.all()}
     # Los códigos que YA existían antes de empezar. Un set en memoria: preguntar "¿está?" cuesta lo mismo
     # con 10 o con 100,000 elementos, y nos ahorra una consulta por renglón.
-    existentes = set(MaterialSAP.objects.values_list("codigo", flat=True))
+    servicios = catalogo == Importacion.Catalogo.SERVICIOS
+    existentes = set(MaterialSAP.objects.filter(es_servicio=servicios).values_list("codigo", flat=True))
     try:
         lector, indice = _leer(archivo)
-        servicios = catalogo == Importacion.Catalogo.SERVICIOS
         resultado = _validar_renglones(lector, indice, centros, existentes, servicios)
     except UnicodeDecodeError:
         raise ArchivoInvalido("El archivo no está en UTF-8. En Excel: Guardar como → 'Texto Unicode (UTF-8)'.")
