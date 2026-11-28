@@ -209,10 +209,15 @@ class DetalleModificacion(models.Model):
 
 
 class DetalleServicio(models.Model):
-    """ASER_ZSA: solo descripción y grupo de artículos; DM asigna el Código SAP."""
+    """ASER_ZSA: descripción, UMB y grupo de artículos; DM asigna el Código SAP."""
 
     partida = models.OneToOneField(Partida, on_delete=models.CASCADE, primary_key=True, related_name="servicio")
     descripcion = models.CharField("descripción", max_length=40, blank=True)
+    # Pedido de Dave: el tipo de servicio (ZRA o ZSA) se captura y de él depende la UMB que se propone.
+    tipo_servicio = models.ForeignKey(
+        "catalogos.TipoServicio", on_delete=models.PROTECT, null=True, blank=True, verbose_name="tipo de servicio"
+    )
+    umb = models.ForeignKey("catalogos.UMB", on_delete=models.PROTECT, null=True, blank=True, verbose_name="UMB")
     grupo_articulos = models.ForeignKey("catalogos.GrupoArticulos", on_delete=models.PROTECT, null=True, blank=True)
     codigo_sap = models.CharField(
         "Código SAP", max_length=6, unique=True, null=True, blank=True, validators=[validar_codigo_sap]

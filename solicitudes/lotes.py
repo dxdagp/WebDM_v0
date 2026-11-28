@@ -7,24 +7,28 @@ igual: DM marca partidas de uno o varios folios y
 - Excluye con motivo (flujo.aplicar "excluir"), o
 - Finaliza: cada flujo escribe en el catálogo lo suyo y las partidas pasan a TERMINADA.
 
-Un TXT es de un solo tipo: Amp_Mat.txt, Mod_Mat.txt y Mod_Ser.txt tienen columnas distintas.
+Un TXT es de un solo tipo: Amp_Mat.txt, Mod_Mat.txt, Mod_Ser.txt y Alta_Ser.txt tienen columnas distintas.
+
+Las altas de servicios (ASER_ZSA, fase 4e) también se exportan desde aquí (Alta_Ser.txt, con el Código
+SAP que DM escribió en su renglón), pero se terminan como las altas de materiales: con el código.
 """
 
 from django.db import transaction
 
-from . import alcance, ampliacion, modificacion
+from . import alcance, alta_servicio, ampliacion, modificacion
 from .models import Flujo, Partida
 
 E = Partida.Estado
-FLUJOS = (Flujo.AMPL_ZRA, Flujo.MOD_ZRA, Flujo.MOD_ZSA)
+FLUJOS = (Flujo.AMPL_ZRA, Flujo.MOD_ZRA, Flujo.MOD_ZSA)  # se finalizan con "Finalizar seleccionadas"
+EXPORTAN = (*FLUJOS, Flujo.ASER_ZSA)  # tienen TXT
 
 
-def pendientes(usuario):
+def pendientes(usuario, flujos=EXPORTAN):
     """Las partidas de estos flujos que esperan a este DM."""
-    return Partida.objects.filter(alcance.de_mis_centros(usuario), solicitud__flujo__in=FLUJOS, estado=E.EN_DM)
+    return Partida.objects.filter(alcance.de_mis_centros(usuario), solicitud__flujo__in=flujos, estado=E.EN_DM)
 
 
-def seleccion(usuario, ids):
+def seleccion(usuario, ids, flujos=EXPORTAN):
     """Lo que DM marcó. Todas o ninguna: si algo no es de estos flujos o no le toca, no se hace nada."""
     from .flujo import AccionNoPermitida
 
@@ -32,22 +36,22 @@ def seleccion(usuario, ids):
     if not ids:
         raise AccionNoPermitida("Selecciona al menos una partida.")
     partidas = list(
-        pendientes(usuario).filter(pk__in=ids).select_related(
+        pendientes(usuario, flujos).filter(pk__in=ids).select_related(
             "solicitud", "centro", "ampliacion__material", "ampliacion__centro_origen", "ampliacion__almacen_destino",
             "ampliacion__almacen_modelo", "ampliacion__planificador", "ampliacion__grupo_compras", "modificacion__material",
+            "servicio__umb", "servicio__grupo_articulos", "servicio__tipo_servicio",
         ).order_by("solicitud__folio", "numero")
     )
     if len(partidas) != len(ids):
         sobran = Partida.objects.filter(pk__in=ids - {p.pk for p in partidas}).select_related("solicitud")
         nombres = ", ".join(f"{x.solicitud.folio or 'borrador'}/{x.numero}" for x in sobran[:5])
-        raise AccionNoPermitida(
-            f"Solo se exportan o finalizan ampliaciones y modificaciones en Datos Maestros. Quita de la selección: {nombres}."
-        )
+        que = "se exportan o finalizan ampliaciones y modificaciones" if flujos == FLUJOS else "se exportan ampliaciones, modificaciones y altas de servicios"
+        raise AccionNoPermitida(f"Solo {que} en Datos Maestros. Quita de la selección: {nombres}.")
     return partidas
 
 
-def exportar(usuario, ids):
-    """(nombre del archivo, texto) del TXT de lo marcado."""
+def exportar(usuario, ids, codigos=None):
+    """(nombre del archivo, texto) del TXT de lo marcado. `codigos`: los Códigos SAP escritos en la bandeja."""
     from .flujo import AccionNoPermitida
 
     partidas = seleccion(usuario, ids)
@@ -57,6 +61,8 @@ def exportar(usuario, ids):
             "Exporta un tipo a la vez (" + ", ".join(sorted(flujos)) + "): cada uno lleva su propio TXT. Filtra por folio, por ejemplo MOD_ZRA."
         )
     tipo = flujos.pop()
+    if tipo == Flujo.ASER_ZSA:
+        return alta_servicio.NOMBRE_TXT, alta_servicio.texto_txt(partidas, codigos or {})
     if tipo == Flujo.AMPL_ZRA:
         return ampliacion.NOMBRE_TXT, ampliacion.texto_txt(partidas)
     return modificacion.NOMBRE_TXT[tipo], modificacion.texto_txt(partidas, tipo)
@@ -69,10 +75,10 @@ def finalizar(usuario, ids):
 
     if "DM" not in roles_de(usuario):
         raise AccionNoPermitida("Necesitas el rol DM.")
-    seleccion(usuario, ids)  # revisa todo lo marcado antes de bloquear
+    seleccion(usuario, ids, FLUJOS)  # revisa todo lo marcado antes de bloquear
     # SELECT … FOR UPDATE de las partidas (solo de su tabla: of=("self",)), y se vuelven a leer ya bloqueadas.
     bloqueadas = [p.pk for p in Partida.objects.select_for_update(of=("self",)).filter(pk__in=ids).order_by("pk")]
-    partidas = seleccion(usuario, bloqueadas)
+    partidas = seleccion(usuario, bloqueadas, FLUJOS)
     ampl = [p for p in partidas if p.solicitud.flujo == Flujo.AMPL_ZRA]
     mod = [p for p in partidas if p.solicitud.flujo != Flujo.AMPL_ZRA]
     ampliacion.finalizar_partidas(usuario, ampl)

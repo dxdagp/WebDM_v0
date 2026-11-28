@@ -80,8 +80,12 @@ def parecido(a, b):
     return 2 * iguales / (len(pa) + len(pb))
 
 
-def buscar(descripcion, no_parte=""):
-    """Coincidencias de un material contra el catálogo, de la más grave a la más leve."""
+def buscar(descripcion, no_parte="", servicio=False):
+    """Coincidencias de un material contra el catálogo, de la más grave a la más leve.
+
+    Con servicio=True busca en el catálogo de SERVICIOS (ASER_ZSA). Los servicios no tienen
+    No. Parte: la misma descripción ya es un duplicado.
+    """
     descripcion, no_parte = texto_sap(descripcion), texto_sap(no_parte)
     if not descripcion and not no_parte:
         return []
@@ -98,12 +102,14 @@ def buscar(descripcion, no_parte=""):
         return []
 
     resultados = []
-    for m in MaterialSAP.objects.filter(filtro, es_servicio=False)[:2000]:
+    for m in MaterialSAP.objects.filter(filtro, es_servicio=servicio)[:2000]:
         m_desc, m_parte = texto_sap(m.descripcion), texto_sap(m.no_parte_original)
         misma_desc = bool(descripcion) and m_desc == descripcion
         misma_parte = bool(no_parte) and m_parte == no_parte
         p = parecido(descripcion, m_desc) if descripcion else 0
-        if misma_desc and misma_parte:
+        if servicio and misma_desc:
+            tipo, motivo = DUPLICADO, "Ya existe un servicio con la misma descripción."
+        elif misma_desc and misma_parte:
             tipo, motivo = DUPLICADO, "Ya existe con la misma descripción y el mismo No. Parte."
         elif misma_parte:
             tipo, motivo = ADVERTENCIA, "Mismo No. Parte con otra descripción."
@@ -120,6 +126,6 @@ def buscar(descripcion, no_parte=""):
     return resultados[:MAX_RESULTADOS]
 
 
-def bloqueante(descripcion, no_parte):
+def bloqueante(descripcion, no_parte, servicio=False):
     """El primer duplicado exacto, o None. Es lo que impide Enviar."""
-    return next((c for c in buscar(descripcion, no_parte) if c.bloquea), None)
+    return next((c for c in buscar(descripcion, no_parte, servicio) if c.bloquea), None)

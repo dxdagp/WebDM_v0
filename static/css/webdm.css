@@ -142,3 +142,9 @@ td.wd-error { background: #FFEBE9; }
 .wd-tabla-mod td.auto input { min-width: 50px; width: 60px; }
 .wd-tabla-mod input[name$="-valor_nuevo"] { min-width: 300px; }
 .wd-tabla-mod td.auto[data-auto] { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Fase 4e: tabla de alta de servicios (ASER_ZSA). */
+.wd-tabla-aser { min-width: 0; }
+.wd-tabla-aser td.auto input { min-width: 50px; width: 60px; }
+.wd-tabla-aser input[name$="-descripcion"] { min-width: 380px; }
+.wd-tabla-aser select { min-width: 160px; }

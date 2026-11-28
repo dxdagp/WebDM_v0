@@ -67,6 +67,22 @@ class TipoMaterial(Catalogo):
         verbose_name_plural = "tipos de material"
 
 
+class TipoServicio(Catalogo):
+    """Tipo de servicio, catálogo propio (Dave, 28-nov-2026: "es otro catálogo", no los Tipos de material).
+
+    Cada tipo tiene su UMB predeterminada: al capturar un alta de servicio (ASER_ZSA) se propone esa UMB.
+    """
+
+    umb_predeterminada = models.ForeignKey(
+        UMB, on_delete=models.PROTECT, null=True, blank=True, verbose_name="UMB predeterminada",
+        help_text="Se propone al crear servicios de este tipo.",
+    )
+
+    class Meta(Catalogo.Meta):
+        verbose_name = "tipo de servicio"
+        verbose_name_plural = "tipos de servicio"
+
+
 class CategoriaValoracion(Catalogo):
     """Cada categoría determina el Tipo de Material (relación Categoría -> Tipo)."""
 

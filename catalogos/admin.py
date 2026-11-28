@@ -30,11 +30,19 @@ class CentroAdmin(admin.ModelAdmin):
     inlines = [AlmacenInline, GrupoComprasInline, PlanificadorInline]
 
 
-@admin.register(models.UbicacionRefaccion, models.UMB, models.GrupoArticulos, models.TipoMaterial)
+@admin.register(models.UbicacionRefaccion, models.UMB, models.GrupoArticulos)
 class CatalogoAdmin(admin.ModelAdmin):
     list_display = ("codigo", "descripcion", "activo")
     list_filter = ("activo",)
     search_fields = ("codigo", "descripcion")
+
+
+admin.site.register(models.TipoMaterial, CatalogoAdmin)
+
+
+@admin.register(models.TipoServicio)
+class TipoServicioAdmin(CatalogoAdmin):
+    list_display = ("codigo", "descripcion", "umb_predeterminada", "activo")
 
 
 @admin.register(models.CategoriaValoracion)

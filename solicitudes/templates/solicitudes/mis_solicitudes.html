@@ -10,6 +10,7 @@
     <a class="btn btn-primary" href="{% url 'solicitudes:nueva_amat' %}">+ Crear materiales (AMAT_ZRA)</a>
     <a class="btn btn-outline-primary" href="{% url 'solicitudes:nueva_ampl' %}">+ Ampliar a Centro (AMPL_ZRA)</a>
     <a class="btn btn-outline-primary" href="{% url 'solicitudes:nueva_mod' 'materiales' %}">+ Modificar materiales (MOD_ZRA)</a>
+    <a class="btn btn-outline-primary" href="{% url 'solicitudes:nueva_aser' %}">+ Crear servicios (ASER_ZSA)</a>
     <a class="btn btn-outline-primary" href="{% url 'solicitudes:nueva_mod' 'servicios' %}">+ Modificar servicios (MOD_ZSA)</a>
   </div>
 </div>
@@ -21,6 +22,7 @@
       <tr>
         <td>
           {% if s.estado == "BORRADOR" and s.flujo == "AMPL_ZRA" %}<a href="{% url 'solicitudes:editar_ampl' s.pk %}">Borrador #{{ s.pk }}</a>
+          {% elif s.estado == "BORRADOR" and s.flujo == "ASER_ZSA" %}<a href="{% url 'solicitudes:editar_aser' s.pk %}">Borrador #{{ s.pk }}</a>
           {% elif s.estado == "BORRADOR" and s.flujo == "MOD_ZRA" %}<a href="{% url 'solicitudes:editar_mod' 'materiales' s.pk %}">Borrador #{{ s.pk }}</a>
           {% elif s.estado == "BORRADOR" and s.flujo == "MOD_ZSA" %}<a href="{% url 'solicitudes:editar_mod' 'servicios' s.pk %}">Borrador #{{ s.pk }}</a>
           {% elif s.estado == "BORRADOR" %}<a href="{% url 'solicitudes:editar_amat' s.pk %}">Borrador #{{ s.pk }}</a>

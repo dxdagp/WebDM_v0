@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}{% if correccion %}Corregir {{ solicitud }}{% elif solicitud %}Borrador ASER_ZSA{% else %}Nueva solicitud ASER_ZSA{% endif %} · WebDM{% endblock %}
+{% block contenido %}
+<form method="post" id="form-captura" novalidate{% if solicitud and not correccion %} action="{% url 'solicitudes:editar_aser' solicitud.pk %}"{% endif %}>
+  {% csrf_token %}
+  {# Enter en una celda "presiona" el PRIMER botón de envío: este, invisible, para que Enter valide. #}
+  <button type="submit" name="accion" value="validar" class="wd-enter" tabindex="-1" aria-hidden="true">Validar</button>
+  {{ formset.management_form }}
+
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+      {% if correccion %}
+        <div class="text-secondary small"><a href="{% url 'solicitudes:detalle' solicitud.pk %}">{{ solicitud }}</a> / Corregir</div>
+        <h1 class="h4 fw-bold mb-1">Corregir {{ solicitud }}</h1>
+        <div class="text-secondary">Solo aparecen las partidas que puedes corregir ahora. Cada cambio queda en la historia de la partida.</div>
+      {% else %}
+        <div class="text-secondary small">Servicios / Crear servicios (ASER_ZSA)</div>
+        <h1 class="h4 fw-bold mb-1">{% if solicitud %}Borrador ASER_ZSA{% else %}Nueva solicitud ASER_ZSA{% endif %} <span class="wd-estado align-middle">BORRADOR</span></h1>
+        <div class="text-secondary">Folio: se asigna al enviar (formato ASER_ZSA-2026-000001)</div>
+      {% endif %}
+    </div>
+    <div class="d-flex gap-2">
+      {% if correccion %}
+        <button type="submit" name="accion" value="guardar" class="btn btn-outline-secondary">Guardar correcciones</button>
+        {% if puede_reenviar %}<button type="submit" name="accion" value="reenviar" class="btn btn-primary fw-semibold">Guardar y reenviar</button>{% endif %}
+      {% else %}
+        {% if solicitud %}<button type="submit" name="accion" value="eliminar" class="btn btn-outline-danger" formnovalidate onclick="return confirm('¿Eliminar este borrador con todas sus partidas? No se puede deshacer.');">Eliminar borrador</button>{% endif %}
+        <button type="submit" name="accion" value="guardar" class="btn btn-outline-secondary">Guardar borrador</button>
+        <button type="submit" name="accion" value="enviar" class="btn btn-primary fw-semibold">Enviar</button>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if sin_umb %}<div class="alert alert-warning">Ningún tipo de servicio tiene UMB predeterminada: elige la UMB en cada renglón, o pide a ADMIN que la defina en Tipos de servicio.</div>{% endif %}
+  {% for e in formset.non_form_errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+    <span class="text-secondary">Un renglón por servicio. Al elegir el Tipo de servicio se propone su UMB. Puedes pegar desde Excel: Tipo, Descripción, UMB, Grupo de artículos.</span>
+    {% if not correccion %}<button type="button" class="btn btn-sm btn-outline-secondary" id="agregar">+ Agregar partida</button>{% endif %}
+  </div>
+
+  <div class="wd-tabla-caja">
+    <table class="wd-tabla wd-tabla-aser">
+      <thead>
+        <tr>
+          <th class="auto">Partida</th><th>Tipo de servicio</th><th>Descripción</th><th>UMB</th><th>Grupo de artículos</th>
+          <th class="auto">Estado</th>{% if not correccion %}<th class="auto">Acción</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody id="filas">
+        {% for form in formset %}{% include "solicitudes/_fila_aser.html" %}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="wd-leyenda mt-2">
+    <span class="l-auto">Automático: no se captura</span>
+    <span class="l-error">Error: corrígelo para guardar o enviar</span>
+  </div>
+</form>
+{% if not correccion %}<template id="fila-vacia">{% with form=formset.empty_form %}{% include "solicitudes/_fila_aser.html" %}{% endwith %}</template>{% endif %}
+{{ datos_automaticos|json_script:"datos-automaticos" }}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/alta_servicio.js' %}"></script>{% endblock %}

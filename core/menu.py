@@ -19,7 +19,7 @@ OPCIONES = [
     ("Materiales", "Crear materiales", "solicitudes:nueva_amat", {"SOL_MAT", "VAL_MAT"}),
     ("Materiales", "Ampliar a Centro", "solicitudes:nueva_ampl", {"SOL_MAT", "VAL_MAT"}),
     ("Materiales", "Modificar materiales", ("solicitudes:nueva_mod", "materiales"), {"SOL_MAT", "VAL_MAT"}),
-    ("Servicios", "Crear servicios", None, {"SOL_MAT", "VAL_MAT"}),
+    ("Servicios", "Crear servicios", "solicitudes:nueva_aser", {"SOL_MAT", "VAL_MAT"}),
     ("Servicios", "Modificar servicios", ("solicitudes:nueva_mod", "servicios"), {"SOL_MAT", "VAL_MAT"}),
     ("Consulta", "Catálogo de materiales", "catalogo_sap:consulta", {"SOL_MAT", "VAL_MAT", "DM", "ADMIN"}),
     ("Consulta", "Catálogo de servicios", "catalogo_sap:servicios", {"SOL_MAT", "VAL_MAT", "DM", "ADMIN"}),
