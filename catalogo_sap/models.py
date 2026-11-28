@@ -71,7 +71,14 @@ class MaterialCentro(models.Model):
 class Importacion(models.Model):
     """Una carga del TXT de SAP: quién, cuándo, qué archivo y el resumen."""
 
+    class Catalogo(models.TextChoices):
+        # Pedido de Dave (28-nov-2026): materiales y servicios son catálogos distintos,
+        # con su propia importación, consulta y reportes.
+        MATERIALES = "MATERIALES", "Materiales"
+        SERVICIOS = "SERVICIOS", "Servicios"
+
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    catalogo = models.CharField("catálogo", max_length=10, choices=Catalogo.choices, default=Catalogo.MATERIALES)
     fecha = models.DateTimeField(auto_now_add=True)
     nombre_archivo = models.CharField(max_length=255)
     importados = models.PositiveIntegerField(default=0)

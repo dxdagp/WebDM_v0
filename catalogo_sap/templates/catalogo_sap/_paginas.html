@@ -1,0 +1,8 @@
+{# Paginación que conserva los filtros de la búsqueda (q, centro). #}
+{% if pagina.has_other_pages %}
+<nav class="d-flex align-items-center gap-2 mt-3 small">
+  {% if pagina.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="?q={{ q|urlencode }}&centro={{ centro }}&pagina={{ pagina.previous_page_number }}">← Anterior</a>{% endif %}
+  <span class="text-secondary">Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+  {% if pagina.has_next %}<a class="btn btn-sm btn-outline-secondary" href="?q={{ q|urlencode }}&centro={{ centro }}&pagina={{ pagina.next_page_number }}">Siguiente →</a>{% endif %}
+</nav>
+{% endif %}

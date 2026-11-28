@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }} · WebDM{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+  <div>
+    <div class="text-secondary small">Consulta / {{ titulo }}</div>
+    <h1 class="h4 fw-bold mb-0">{{ titulo }} <small class="text-secondary fw-normal fs-6">{{ pagina.paginator.count }} código(s)</small></h1>
+  </div>
+  {% if puede_importar %}<a class="btn btn-outline-primary" href="{% url 'catalogo_sap:importar' %}?catalogo={% if catalogo == 'servicios' %}SERVICIOS{% else %}MATERIALES{% endif %}">Importar TXT de SAP</a>{% endif %}
+</div>
+
+<form method="get" class="d-flex flex-wrap gap-2 mb-3">
+  <input class="form-control form-control-sm" style="max-width:320px" name="q" value="{{ q }}" placeholder="Código, descripción o No. Parte">
+  <select class="form-select form-select-sm" style="max-width:160px" name="centro">
+    <option value="">Todos los Centros</option>
+    {% for c in centros %}<option value="{{ c.pk }}"{% if centro == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.codigo }}</option>{% endfor %}
+  </select>
+  <button class="btn btn-sm btn-outline-secondary">Buscar</button>
+  {% if q or centro %}<a class="btn btn-sm btn-link" href="?">Limpiar</a>{% endif %}
+</form>
+
+<div class="wd-tabla-caja">
+  <table class="table table-sm mb-0 align-middle">
+    <thead><tr><th>Código SAP</th><th>Descripción</th><th>No. Parte</th><th>Tipo</th><th>UMB</th><th>Centros</th><th>Origen</th></tr></thead>
+    <tbody>
+    {% for m in pagina %}
+      <tr>
+        <td class="fw-semibold">{{ m.codigo }}</td>
+        <td class="wd-libre">{{ m.descripcion }}</td>
+        <td>{{ m.no_parte_original|default:"—" }}</td>
+        <td>{{ m.tipo_material }}</td>
+        <td>{{ m.umb|default:"—" }}</td>
+        <td class="wd-libre">{% for mc in m.centros.all %}<span class="badge text-bg-secondary me-1">{{ mc.centro.codigo }}</span>{% empty %}—{% endfor %}</td>
+        <td class="small">
+          {% if m.origen == "IMPORT" %}<span class="badge text-bg-info">IMPORT</span> {{ m.creado_por }}{% if m.importacion %} · {{ m.importacion.fecha|date:"d/m/Y" }}{% endif %}
+          {% else %}<span class="badge text-bg-success">WEBDM</span> {{ m.folio_origen }}{% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-secondary">No hay códigos{% if q or centro %} con ese filtro{% endif %}.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "catalogo_sap/_paginas.html" with pagina=pagina %}
+{% endblock %}

@@ -1,0 +1,4 @@
+CODIGO_SAP	DESCRIPCION	CENTRO	TIPO_MATERIAL	UMB
+900001	Mano de obra mecanica	MTTU	ZSA	H
+900002	Alineacion y balanceo	MTTU	ZRA	SER
+900002	Alineacion y balanceo	MEIX	ZRA	SER

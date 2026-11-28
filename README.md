@@ -26,5 +26,6 @@ La explicación paso a paso, incluida la creación de la base de datos en Postgr
 | 2 | Captura tipo Excel de AMAT_ZRA y folios ([guía](docs/fase-2.md)) | Hecha |
 | 3 | Flujos, bandejas de VAL_MAT y DM, Código SAP, sesiones ([guía](docs/fase-3.md)) | Hecha |
 | 4a | Imágenes y búsqueda de duplicados ([guía](docs/fase-4.md)) | Hecha |
-| 4b | AMPL_ZRA y exportación TXT, modificaciones, servicios, importación SAP, vencimientos | Pendiente |
+| 4b | Catálogos SAP de materiales y servicios, importación del TXT ([guía](docs/fase-4b.md)) | Hecha |
+| 4c | AMPL_ZRA y exportación TXT, modificaciones, servicios, vencimientos | Pendiente |
 | 5 | Despliegue en Ubuntu (Nginx, Gunicorn, systemd) | Pendiente |

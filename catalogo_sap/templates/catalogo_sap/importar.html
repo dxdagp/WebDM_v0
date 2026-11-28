@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titulo %}Importar catálogo SAP · WebDM{% endblock %}
+{% block contenido %}
+<div class="mb-3">
+  <div class="text-secondary small">Administración / Importar catálogo SAP</div>
+  <h1 class="h4 fw-bold mb-0">Importar catálogo SAP</h1>
+</div>
+
+<section class="wd-ficha mb-4">
+  <form method="post" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center mb-3"
+        onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Importando…';">
+    {% csrf_token %}
+    <span class="fw-semibold">Catálogo:</span>
+    {% for valor, etiqueta in catalogos %}
+      <label class="form-check-label me-2"><input class="form-check-input me-1" type="radio" name="catalogo" value="{{ valor }}" required{% if elegido == valor %} checked{% endif %}>{{ etiqueta }}</label>
+    {% endfor %}
+    <input class="form-control w-auto" type="file" name="archivo" accept=".txt,.tsv,text/plain" required>
+    <button class="btn btn-primary">Importar</button>
+  </form>
+  <div class="small text-secondary">
+    <p class="mb-1"><strong>Formato:</strong> .txt separado por tabuladores, en UTF-8, con renglón de encabezados. Un renglón por material y Centro.</p>
+    <p class="mb-1"><strong>Columnas obligatorias:</strong> CODIGO_SAP · DESCRIPCION · CENTRO · TIPO_MATERIAL · UMB. <strong>Opcional:</strong> NO_PARTE_ORIGINAL. Las demás se ignoran.</p>
+    <p class="mb-1"><strong>Materiales</strong> son tipo ZRA; <strong>servicios</strong> pueden ser ZRA o ZSA. Un mismo código no puede estar en los dos catálogos.</p>
+    <p class="mb-0">Los renglones buenos se importan aunque otros tengan error. Un código que ya existe en WebDM no se importa (para agregarlo a otro Centro usa AMPL_ZRA). Si un código trae descripciones distintas, no se importa ninguno de sus renglones.</p>
+  </div>
+</section>
+
+<h2 class="h6 fw-bold">Historial</h2>
+<div class="wd-tabla-caja">
+  <table class="table table-sm mb-0 align-middle">
+    <thead><tr><th>Fecha</th><th>Catálogo</th><th>Usuario</th><th>Archivo</th><th>Importados</th><th>Con error</th><th></th></tr></thead>
+    <tbody>
+    {% for imp in historial %}
+      <tr>
+        <td>{{ imp.fecha|date:"d/m/Y H:i" }}</td><td>{{ imp.get_catalogo_display }}</td><td>{{ imp.usuario }}</td><td class="wd-libre">{{ imp.nombre_archivo }}</td>
+        <td>{{ imp.importados }}</td><td>{% if imp.errores %}<span class="text-danger fw-semibold">{{ imp.errores }}</span>{% else %}0{% endif %}</td>
+        <td><a href="{% url 'catalogo_sap:importacion' imp.pk %}">Ver</a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-secondary">Aún no hay importaciones.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
