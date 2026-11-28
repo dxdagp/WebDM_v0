@@ -65,3 +65,15 @@ class AdminTests(TestCase):
                     self.assertEqual(r.status_code, 200, f"{modelo.__name__} {obj.pk}")
         # Group puede no tener datos; todo lo demás sí, para que la prueba de verdad abra su ficha.
         self.assertLessEqual(set(sin_datos), {"Group"}, sin_datos)
+
+    def test_ficha_de_partida_con_bitacora_y_sin_id(self):
+        self.client.force_login(self.admin)
+        p = Partida.objects.get(solicitud__folio="AMAT_ZRA-2026-000001", numero=10)
+        Evento.objects.create(solicitud=p.solicitud, partida=p, usuario=None, tipo=Evento.Tipo.VENCIMIENTO,
+                              estado_anterior="DEVUELTA_SOL", estado_nuevo="CANCELADA", motivo="CANCELADA POR VENCIMIENTO")
+        r = self.client.get(reverse("admin:solicitudes_partida_change", args=[p.pk]))
+        self.assertContains(r, "Bitácora de la partida")
+        self.assertContains(r, "Envío")
+        self.assertContains(r, "CANCELADA POR VENCIMIENTO")
+        self.assertContains(r, "Sistema")
+        self.assertNotContains(r, "<label>ID:</label>", html=False)
