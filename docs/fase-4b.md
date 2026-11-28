@@ -7,6 +7,7 @@ Revisión 3, secciones 12 y 17.1, con las decisiones de Dave del 28-nov-2026:
 | Quién importa | ADMIN y DM |
 | Materiales y servicios | **Catálogos separados e independientes**: se importan, consultan y (después) reportan por separado. Materiales son ZRA; servicios pueden ser ZRA o ZSA. El mismo código puede existir en los dos (material 500001 ACUMULADOR y servicio 500001 SERVICIO DE MUELLES). |
 | Mismo código con descripciones distintas | No se importa **ninguno** de sus renglones |
+| Columnas | Materiales llevan además grupo de compras, grupo de artículos, categoría de valoración y CeBe. Servicios **no llevan Centro**: no dependen de uno. |
 | Normalización | Igual que la captura: mayúsculas, sin acentos, conserva la Ñ |
 | Tamaño del archivo | Sin límite: se lee renglón por renglón |
 
@@ -18,7 +19,7 @@ cd C:\proyectos\WebDM_v0
 git fetch origin
 git checkout fase-4b
 git pull
-python manage.py migrate      # columna "catalogo" en importaciones y código único por catálogo
+python manage.py migrate      # catálogo en importaciones, código único por catálogo, datos por Centro
 python manage.py test
 python manage.py runserver
 ```
@@ -26,18 +27,35 @@ python manage.py runserver
 1. Entra como `dm` (o un ADMIN). En el menú aparece **Administración → Importar catálogo SAP**.
 2. Elige **Materiales** y sube `docs\ejemplos\catalogo-materiales-ejemplo.txt`. Resultado: 3 importados y 2 con error (un código de 5 dígitos y un Centro que no existe). La tabla dice en qué línea está cada error y por qué.
 3. Abre **Consulta → Catálogo de materiales**. El 310001 aparece en MEIX y MTTU, con origen IMPORT y tu usuario.
-4. Importa `catalogo-servicios-ejemplo.txt` eligiendo **Servicios**, y revisa **Catálogo de servicios**.
+4. Importa `catalogo-servicios-ejemplo.txt` eligiendo **Servicios**: entran 3. Uno de ellos es el 310001 SERVICIO DE MUELLES, el mismo código que la balata en materiales, porque los catálogos son independientes.
 5. Vuelve a importar el archivo de materiales: ahora todo es error, porque los códigos ya existen. Para agregar un Centro a un material existente está AMPL_ZRA, que viene después.
 
-### Cómo sacar el TXT desde Excel
+### Cabeceras del TXT
 
-**Archivo → Guardar como → "Texto Unicode (UTF-8)"** o "Texto (delimitado por tabulaciones)". El primer renglón deben ser los encabezados:
+**Materiales**, un renglón por material y Centro:
 
 ```
-CODIGO_SAP	DESCRIPCION	CENTRO	TIPO_MATERIAL	UMB	NO_PARTE_ORIGINAL
+CODIGO_SAP	DESCRIPCION	CENTRO	TIPO_MATERIAL	UMB	GRUPO_COMPRAS	GRUPO_ARTICULOS	CATEGORIA_VALORACION	CEBE	NO_PARTE_ORIGINAL
 ```
 
-Las columnas pueden venir en cualquier orden. Las que no conozco se ignoran.
+Todas son obligatorias menos `NO_PARTE_ORIGINAL`.
+
+**Servicios**, un renglón por servicio y sin Centro:
+
+```
+CODIGO_SAP	DESCRIPCION	TIPO_MATERIAL	UMB
+```
+
+Las columnas pueden venir en cualquier orden y las desconocidas se ignoran. En Excel se guarda con **Archivo → Guardar como → "Texto Unicode (UTF-8)"** o "Texto (delimitado por tabulaciones)".
+
+### Dónde se guarda cada dato
+
+| Dato | Tabla | Por qué |
+| --- | --- | --- |
+| Descripción, Tipo, UMB, No. Parte, Grupo de artículos | `catalogo_sap_materialsap` | Son del material, igual en todos los Centros. |
+| Grupo de compras, Categoría de valoración, CeBe | `catalogo_sap_materialcentro` | En SAP dependen del Centro. |
+
+Si un material trae grupos de artículos distintos en sus renglones, se queda el del primer renglón. Las descripciones distintas sí bloquean el código completo.
 
 ## 2. Un catálogo por dentro, dos por fuera
 
@@ -161,14 +179,15 @@ GROUP BY mensaje ORDER BY 2 DESC;
 - Descripción distinta: no se sube ninguno.
 - Código ya existente.
 - El mismo código en materiales y en servicios.
-- Catálogo de servicios y ZSA en materiales.
+- Catálogo de servicios sin Centro, y ZSA en materiales.
+- Columnas nuevas de materiales: grupo de compras, grupo de artículos, categoría de valoración y CeBe.
 - BOM y columnas en otro orden.
 - Archivo que no está en UTF-8.
 - Encabezados faltantes.
 - Permisos.
 - La consulta separa materiales y servicios.
 
-En total pasan 118 pruebas.
+En total pasan 119 pruebas.
 
 ## 7. Pendiente para la fase 5
 

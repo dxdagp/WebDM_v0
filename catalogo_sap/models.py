@@ -30,6 +30,7 @@ class MaterialSAP(models.Model):
     tipo_material = models.CharField("tipo de material", max_length=10)
     umb = models.CharField("UMB", max_length=10, blank=True)
     no_parte_original = models.CharField("No. Parte Original", max_length=40, blank=True)
+    grupo_articulos = models.CharField("grupo de artículos", max_length=20, blank=True)
     es_servicio = models.BooleanField(default=False)
     origen = models.CharField(max_length=10, choices=Origen.choices)
     folio_origen = models.CharField("folio de origen", max_length=30, blank=True, help_text="Solo para origen WEBDM.")
@@ -58,6 +59,11 @@ class MaterialCentro(models.Model):
 
     material = models.ForeignKey(MaterialSAP, on_delete=models.CASCADE, related_name="centros")
     centro = models.ForeignKey("catalogos.Centro", on_delete=models.PROTECT)
+    # Datos que en SAP dependen del Centro (pedido de Dave, 28-nov-2026). Texto, como TIPO y UMB:
+    # vienen del TXT de SAP y no deben fallar si aún no existen en los catálogos de WebDM.
+    grupo_compras = models.CharField("grupo de compras", max_length=20, blank=True)
+    categoria_valoracion = models.CharField("categoría de valoración", max_length=20, blank=True)
+    cebe = models.CharField("Centro de Beneficio (CeBe)", max_length=20, blank=True)
     agregado = models.DateTimeField(auto_now_add=True)
 
     class Meta:

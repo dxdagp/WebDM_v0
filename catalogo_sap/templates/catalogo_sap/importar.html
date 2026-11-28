@@ -18,10 +18,11 @@
     <button class="btn btn-primary">Importar</button>
   </form>
   <div class="small text-secondary">
-    <p class="mb-1"><strong>Formato:</strong> .txt separado por tabuladores, en UTF-8, con renglón de encabezados. Un renglón por material y Centro.</p>
-    <p class="mb-1"><strong>Columnas obligatorias:</strong> CODIGO_SAP · DESCRIPCION · CENTRO · TIPO_MATERIAL · UMB. <strong>Opcional:</strong> NO_PARTE_ORIGINAL. Las demás se ignoran.</p>
-    <p class="mb-1"><strong>Materiales</strong> son tipo ZRA; <strong>servicios</strong> pueden ser ZRA o ZSA. Los dos catálogos son independientes: un mismo código puede existir como material y como servicio.</p>
-    <p class="mb-0">Los renglones buenos se importan aunque otros tengan error. Un código que ya existe en WebDM no se importa (para agregarlo a otro Centro usa AMPL_ZRA). Si un código trae descripciones distintas, no se importa ninguno de sus renglones.</p>
+    <p class="mb-1"><strong>Formato:</strong> .txt separado por tabuladores, en UTF-8, con renglón de encabezados. Las columnas pueden ir en cualquier orden.</p>
+    <p class="mb-1"><strong>Materiales</strong> (un renglón por material y Centro; tipo ZRA): <code>{{ columnas.MATERIALES.obligatorias|join:" · " }}</code>. Opcional: <code>NO_PARTE_ORIGINAL</code>.</p>
+    <p class="mb-1"><strong>Servicios</strong> (un renglón por servicio, sin Centro; tipo ZRA o ZSA): <code>{{ columnas.SERVICIOS.obligatorias|join:" · " }}</code>.</p>
+    <p class="mb-1">Los dos catálogos son independientes: un mismo código puede existir como material y como servicio.</p>
+    <p class="mb-0">Los renglones buenos se importan aunque otros tengan error. Un código que ya existe en ese catálogo no se importa (para agregar un material a otro Centro usa AMPL_ZRA). Si un material trae descripciones distintas, no se importa ninguno de sus renglones.</p>
   </div>
 </section>
 

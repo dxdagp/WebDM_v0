@@ -2,19 +2,20 @@
 
 Formato del archivo:
 - Texto separado por tabuladores, en UTF-8 (con o sin BOM), con renglón de encabezados.
-- Obligatorias: CODIGO_SAP, DESCRIPCION, CENTRO, TIPO_MATERIAL, UMB.
-- Opcional: NO_PARTE_ORIGINAL. Cualquier otra columna se ignora.
-- Un renglón por combinación material-Centro.
+- Las columnas pueden venir en cualquier orden; las que no se conocen se ignoran.
+- MATERIALES (un renglón por material y Centro):
+    CODIGO_SAP, DESCRIPCION, CENTRO, TIPO_MATERIAL, UMB, GRUPO_COMPRAS, GRUPO_ARTICULOS,
+    CATEGORIA_VALORACION, CEBE; opcional NO_PARTE_ORIGINAL.
+- SERVICIOS (un renglón por servicio; no dependen de un Centro):
+    CODIGO_SAP, DESCRIPCION, TIPO_MATERIAL, UMB.
 
 Reglas (confirmadas por Dave el 28-nov-2026):
 - Cada renglón se valida por separado; los buenos se importan aunque otros fallen.
-- Código + Centro no se repite dentro del archivo.
-- Si el código ya existía en WebDM ANTES de la importación: error (se amplía con AMPL_ZRA).
-- Si un código trae descripciones distintas en sus renglones: no se importa NINGUNO de sus renglones.
-- Materiales y servicios son catálogos SEPARADOS: quien importa elige a cuál va el archivo.
-  Materiales son ZRA; servicios pueden ser ZRA o ZSA. Un ZSA en el archivo de materiales es error.
-- Los catálogos son independientes: el mismo código puede ser un material y un servicio distintos
-  (ej. material 500001 ACUMULADOR y servicio 500001 SERVICIO DE MUELLES). Único dentro de cada catálogo.
+- Materiales: Código + Centro no se repite. Servicios: el código no se repite.
+- Si el código ya existía en ESE catálogo antes de la importación: error.
+- Si un código de materiales trae descripciones distintas: no se importa NINGUNO de sus renglones.
+- Materiales y servicios son catálogos independientes: el mismo código puede estar en los dos.
+  Materiales son ZRA; servicios ZRA o ZSA. Un ZSA en el archivo de materiales es error.
 - Sin límite de tamaño: el archivo se lee renglón por renglón, no completo en memoria.
 
 Tres pasos:
@@ -34,8 +35,20 @@ from solicitudes.normalizar import texto_sap
 
 from .models import ErrorImportacion, Importacion, MaterialCentro, MaterialSAP
 
-OBLIGATORIAS = ["CODIGO_SAP", "DESCRIPCION", "CENTRO", "TIPO_MATERIAL", "UMB"]
-OPCIONALES = ["NO_PARTE_ORIGINAL"]
+# Columnas por catálogo, en el orden recomendado para el archivo.
+COLUMNAS = {
+    "MATERIALES": {
+        "obligatorias": ["CODIGO_SAP", "DESCRIPCION", "CENTRO", "TIPO_MATERIAL", "UMB", "GRUPO_COMPRAS",
+                         "GRUPO_ARTICULOS", "CATEGORIA_VALORACION", "CEBE"],
+        "opcionales": ["NO_PARTE_ORIGINAL"],
+    },
+    "SERVICIOS": {
+        "obligatorias": ["CODIGO_SAP", "DESCRIPCION", "TIPO_MATERIAL", "UMB"],
+        "opcionales": [],
+    },
+}
+LARGO_MAXIMO = {"TIPO_MATERIAL": 10, "UMB": 10, "GRUPO_COMPRAS": 20, "GRUPO_ARTICULOS": 20,
+                "CATEGORIA_VALORACION": 20, "CEBE": 20}
 TIPOS_SOLO_SERVICIO = {"ZSA"}
 LOTE = 1000  # renglones por INSERT en bulk_create
 
@@ -49,10 +62,12 @@ class Renglon:
     linea: int
     codigo: str
     descripcion: str
-    centro: Centro
-    tipo_material: str
-    umb: str
-    no_parte: str
+    centro: Centro | None  # None en servicios
+    datos: dict  # TIPO_MATERIAL, UMB, NO_PARTE_ORIGINAL, GRUPO_COMPRAS…
+
+    @property
+    def centro_txt(self):
+        return self.centro.codigo if self.centro else ""
 
 
 @dataclass
@@ -64,7 +79,7 @@ class Resultado:
         self.errores.append((linea, codigo[:20], centro[:10], mensaje[:255]))
 
 
-def _leer(archivo):
+def _leer(archivo, columnas):
     """Devuelve un lector de renglones (diccionarios) y la lista de encabezados.
 
     TextIOWrapper decodifica los bytes a texto MIENTRAS se lee, en pedazos: así un archivo
@@ -77,17 +92,18 @@ def _leer(archivo):
         encabezados = [h.strip().upper() for h in next(lector)]
     except StopIteration:
         raise ArchivoInvalido("El archivo está vacío.")
-    faltan = [c for c in OBLIGATORIAS if c not in encabezados]
+    faltan = [c for c in columnas["obligatorias"] if c not in encabezados]
     if faltan:
         raise ArchivoInvalido(
             "Faltan columnas obligatorias: " + ", ".join(faltan)
             + ". ¿Está separado por tabuladores y tiene renglón de encabezados?"
         )
-    indice = {nombre: encabezados.index(nombre) for nombre in OBLIGATORIAS + OPCIONALES if nombre in encabezados}
+    conocidas = columnas["obligatorias"] + columnas["opcionales"]
+    indice = {nombre: encabezados.index(nombre) for nombre in conocidas if nombre in encabezados}
     return lector, indice
 
 
-def _validar_renglones(lector, indice, centros, existentes, servicios):
+def _validar_renglones(lector, indice, columnas, centros, existentes, servicios):
     """Paso 1: cada renglón por sí solo."""
     resultado = Resultado()
     for linea, valores in enumerate(lector, start=2):  # la línea 1 son los encabezados
@@ -98,32 +114,38 @@ def _validar_renglones(lector, indice, centros, existentes, servicios):
             i = indice.get(nombre)
             return valores[i].strip() if i is not None and i < len(valores) else ""
 
-        codigo, centro_txt = col("CODIGO_SAP"), col("CENTRO").upper()
+        codigo = col("CODIGO_SAP")
+        centro_txt = col("CENTRO").upper()
         descripcion = texto_sap(col("DESCRIPCION"))
-        tipo, umb = col("TIPO_MATERIAL").upper(), col("UMB").upper()
-        no_parte = texto_sap(col("NO_PARTE_ORIGINAL"))
-        vacios = [n for n, v in [("CODIGO_SAP", codigo), ("DESCRIPCION", descripcion), ("CENTRO", centro_txt),
-                                 ("TIPO_MATERIAL", tipo), ("UMB", umb)] if not v]
+        datos = {n: col(n).upper() for n in LARGO_MAXIMO if n in indice}
+        datos["NO_PARTE_ORIGINAL"] = texto_sap(col("NO_PARTE_ORIGINAL"))
+        valores_obligatorios = {"CODIGO_SAP": codigo, "DESCRIPCION": descripcion, "CENTRO": centro_txt, **datos}
+        vacios = [n for n in columnas["obligatorias"] if not valores_obligatorios.get(n)]
+        largos = [f"{n} (máx. {m})" for n, m in LARGO_MAXIMO.items() if len(datos.get(n, "")) > m]
+
         if vacios:
             mensaje = "Faltan datos obligatorios: " + ", ".join(vacios) + "."
         elif not (len(codigo) == 6 and codigo.isdigit()):
             mensaje = "El Código SAP debe tener exactamente 6 dígitos."
-        elif centro_txt not in centros:
+        elif not servicios and centro_txt not in centros:
             mensaje = f"El Centro {centro_txt} no existe en WebDM."
         elif len(descripcion) > 40:
             mensaje = f"La descripción tiene {len(descripcion)} caracteres; el máximo es 40."
-        elif len(no_parte) > 40:
+        elif len(datos["NO_PARTE_ORIGINAL"]) > 40:
             mensaje = "El No. Parte Original tiene más de 40 caracteres."
-        elif len(tipo) > 10 or len(umb) > 10:
-            mensaje = "TIPO_MATERIAL y UMB tienen máximo 10 caracteres."
-        elif not servicios and tipo in TIPOS_SOLO_SERVICIO:
-            mensaje = f"{tipo} es de servicios; impórtalo en el catálogo de servicios."
+        elif largos:
+            mensaje = "Demasiado largo: " + ", ".join(largos) + "."
+        elif not servicios and datos["TIPO_MATERIAL"] in TIPOS_SOLO_SERVICIO:
+            mensaje = f"{datos['TIPO_MATERIAL']} es de servicios; impórtalo en el catálogo de servicios."
         elif codigo in existentes:
-            mensaje = "El código ya existía en este catálogo antes de esta importación. Para otro Centro usa AMPL_ZRA."
+            mensaje = "El código ya existía en este catálogo antes de esta importación."
+            if not servicios:
+                mensaje += " Para otro Centro usa AMPL_ZRA."
         else:
-            resultado.buenos.append(Renglon(linea, codigo, descripcion, centros[centro_txt], tipo, umb, no_parte))
+            centro = None if servicios else centros[centro_txt]
+            resultado.buenos.append(Renglon(linea, codigo, descripcion, centro, datos))
             continue
-        resultado.error(linea, codigo, centro_txt, mensaje)
+        resultado.error(linea, codigo, "" if servicios else centro_txt, mensaje)
     return resultado
 
 
@@ -139,16 +161,17 @@ def _validar_entre_renglones(resultado):
         if len({r.descripcion for r in renglones}) > 1:
             lineas = ", ".join(str(r.linea) for r in renglones)
             for r in renglones:
-                resultado.error(r.linea, codigo, r.centro.codigo,
+                resultado.error(r.linea, codigo, r.centro_txt,
                                 f"El código trae descripciones distintas (líneas {lineas}); no se importó ninguna.")
             continue
         vistos = {}
         for r in renglones:
-            if r.centro.pk in vistos:
-                resultado.error(r.linea, codigo, r.centro.codigo,
-                                f"Código y Centro repetidos (ya venían en la línea {vistos[r.centro.pk]}).")
+            llave = r.centro.pk if r.centro else None  # servicios: el código solo, sin Centro
+            if llave in vistos:
+                que = "Código y Centro repetidos" if r.centro else "Código repetido"
+                resultado.error(r.linea, codigo, r.centro_txt, f"{que} (ya venía en la línea {vistos[llave]}).")
             else:
-                vistos[r.centro.pk] = r.linea
+                vistos[llave] = r.linea
                 buenos.append(r)
     resultado.buenos = buenos
     resultado.errores.sort()
@@ -163,9 +186,10 @@ def importar(archivo, nombre, usuario, catalogo=Importacion.Catalogo.MATERIALES)
     # con 10 o con 100,000 elementos, y nos ahorra una consulta por renglón.
     servicios = catalogo == Importacion.Catalogo.SERVICIOS
     existentes = set(MaterialSAP.objects.filter(es_servicio=servicios).values_list("codigo", flat=True))
+    columnas = COLUMNAS[catalogo]
     try:
-        lector, indice = _leer(archivo)
-        resultado = _validar_renglones(lector, indice, centros, existentes, servicios)
+        lector, indice = _leer(archivo, columnas)
+        resultado = _validar_renglones(lector, indice, columnas, centros, existentes, servicios)
     except UnicodeDecodeError:
         raise ArchivoInvalido("El archivo no está en UTF-8. En Excel: Guardar como → 'Texto Unicode (UTF-8)'.")
     except csv.Error as e:
@@ -179,16 +203,21 @@ def importar(archivo, nombre, usuario, catalogo=Importacion.Catalogo.MATERIALES)
     for r in resultado.buenos:
         if r.codigo not in materiales:
             materiales[r.codigo] = MaterialSAP(
-                codigo=r.codigo, descripcion=r.descripcion, tipo_material=r.tipo_material, umb=r.umb,
-                no_parte_original=r.no_parte, es_servicio=servicios, origen=MaterialSAP.Origen.IMPORT,
+                codigo=r.codigo, descripcion=r.descripcion, tipo_material=r.datos["TIPO_MATERIAL"],
+                umb=r.datos["UMB"], no_parte_original=r.datos["NO_PARTE_ORIGINAL"],
+                grupo_articulos=r.datos.get("GRUPO_ARTICULOS", ""), es_servicio=servicios, origen=MaterialSAP.Origen.IMPORT,
                 importacion=importacion, creado_por=usuario,
             )
     try:
         # bulk_create: un INSERT con muchos VALUES (…), (…) por lote, en vez de uno por material.
         # En PostgreSQL devuelve los id generados (RETURNING id), que usamos abajo.
         MaterialSAP.objects.bulk_create(materiales.values(), batch_size=LOTE)
+        # Solo los materiales tienen Centro (con su grupo de compras, categoría y CeBe).
         MaterialCentro.objects.bulk_create(
-            [MaterialCentro(material=materiales[r.codigo], centro=r.centro) for r in resultado.buenos],
+            [MaterialCentro(material=materiales[r.codigo], centro=r.centro,
+                            grupo_compras=r.datos["GRUPO_COMPRAS"], cebe=r.datos["CEBE"],
+                            categoria_valoracion=r.datos["CATEGORIA_VALORACION"])
+             for r in resultado.buenos if r.centro],
             batch_size=LOTE,
         )
     except IntegrityError:

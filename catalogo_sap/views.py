@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from catalogos.models import Centro
 
-from .importar import ArchivoInvalido, importar
+from .importar import COLUMNAS, ArchivoInvalido, importar
 from .models import Importacion, MaterialCentro, MaterialSAP
 
 ROLES_IMPORTAR = {"ADMIN", "DM"}
@@ -44,11 +44,11 @@ def consulta(request, catalogo="materiales"):
         materiales = materiales.filter(
             Q(codigo__startswith=texto) | Q(descripcion__icontains=texto) | Q(no_parte_original__icontains=texto)
         )
-    if centro:
+    if centro and not datos_catalogo["servicio"]:  # los servicios no dependen de un Centro
         materiales = materiales.filter(centros__centro_id=centro)
     pagina = Paginator(materiales.order_by("codigo"), 50).get_page(request.GET.get("pagina"))
     return render(request, "catalogo_sap/consulta.html", {
-        "pagina": pagina, "q": texto, "centro": centro, "catalogo": catalogo, "titulo": datos_catalogo["titulo"],
+        "pagina": pagina, "q": texto, "centro": centro, "catalogo": catalogo, "titulo": datos_catalogo["titulo"], "es_servicios": datos_catalogo["servicio"],
         "centros": Centro.objects.order_by("codigo"),
         "puede_importar": puede_importar(request.user),
     })
@@ -76,6 +76,7 @@ def importar_txt(request):
     return render(request, "catalogo_sap/importar.html", {
         "historial": Importacion.objects.select_related("usuario")[:20],
         "catalogos": Importacion.Catalogo.choices,
+        "columnas": COLUMNAS,
         "elegido": request.POST.get("catalogo") or request.GET.get("catalogo", ""),
     })
 
