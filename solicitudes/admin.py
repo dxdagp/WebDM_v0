@@ -16,6 +16,12 @@ class SoloLecturaMixin:
     def has_delete_permission(self, request, obj=None):
         return False
 
+    def get_readonly_fields(self, request, obj=None):
+        """Todo de solo lectura. Así los campos que Django llena solo (auto_now_add, como
+        ImagenPartida.subida o Evento.fecha) se pueden listar en `fields` sin el error
+        "'subida' cannot be specified ... non-editable field"."""
+        return self.fields or [f.name for f in self.model._meta.fields]
+
 
 class PartidaInline(SoloLecturaMixin, admin.TabularInline):
     model = models.Partida
