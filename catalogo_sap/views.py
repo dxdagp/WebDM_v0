@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Prefetch, Q
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from catalogos.models import Centro
@@ -35,18 +35,25 @@ def consulta(request, catalogo="materiales"):
     datos_catalogo = CATALOGOS[catalogo]
     texto = request.GET.get("q", "").strip()
     centro = request.GET.get("centro", "")
-    materiales = MaterialSAP.objects.filter(es_servicio=datos_catalogo["servicio"]).select_related("creado_por", "importacion").prefetch_related(
-        # Prefetch trae los Centros de los 50 materiales de la página en UNA consulta extra (no 50).
-        Prefetch("centros", queryset=MaterialCentro.objects.select_related("centro").order_by("centro__codigo"))
-    )
+    if datos_catalogo["servicio"]:
+        # Servicios: un renglón por código (no dependen de un Centro).
+        renglones = MaterialSAP.objects.filter(es_servicio=True).select_related("creado_por", "importacion")
+        prefijo, orden = "", ["codigo"]
+    else:
+        # Materiales: un renglón por Material + Centro (pedido de Dave). La consulta parte de
+        # MaterialCentro y trae su material y su Centro con JOIN (select_related).
+        renglones = MaterialCentro.objects.filter(material__es_servicio=False).select_related(
+            "centro", "material__creado_por", "material__importacion")
+        prefijo, orden = "material__", ["material__codigo", "centro__codigo"]
+        if centro:
+            renglones = renglones.filter(centro_id=centro)
     if texto:
         # Q(...) | Q(...) = OR en el WHERE.
-        materiales = materiales.filter(
-            Q(codigo__startswith=texto) | Q(descripcion__icontains=texto) | Q(no_parte_original__icontains=texto)
+        renglones = renglones.filter(
+            Q(**{f"{prefijo}codigo__startswith": texto}) | Q(**{f"{prefijo}descripcion__icontains": texto})
+            | Q(**{f"{prefijo}no_parte_original__icontains": texto})
         )
-    if centro and not datos_catalogo["servicio"]:  # los servicios no dependen de un Centro
-        materiales = materiales.filter(centros__centro_id=centro)
-    pagina = Paginator(materiales.order_by("codigo"), 50).get_page(request.GET.get("pagina"))
+    pagina = Paginator(renglones.order_by(*orden), 50).get_page(request.GET.get("pagina"))
     return render(request, "catalogo_sap/consulta.html", {
         "pagina": pagina, "q": texto, "centro": centro, "catalogo": catalogo, "titulo": datos_catalogo["titulo"], "es_servicios": datos_catalogo["servicio"],
         "centros": Centro.objects.order_by("codigo"),

@@ -201,6 +201,16 @@ class PantallasTests(TestCase):
         r = self.client.get(reverse("catalogo_sap:consulta"), {"q": "filt", "centro": self.c["meix"].pk})
         self.assertNotContains(r, "123456")  # existe solo en MTTU
 
+    def test_materiales_un_renglon_por_material_y_centro(self):
+        importar(txt("123456\tFILTRO\tMTTU\tZRA\tPZA\t\t", "123456\tFILTRO\tMEIX\tZRA\tPZA\t\t"), "m.txt", self.dm)
+        self.client.force_login(self.sol)
+        r = self.client.get(reverse("catalogo_sap:consulta"))
+        self.assertEqual([(mc.material.codigo, mc.centro.codigo) for mc in r.context["pagina"]],
+                         [("123456", "MEIX"), ("123456", "MTTU")])
+        self.assertContains(r, "CEBE-MEIX")
+        r = self.client.get(reverse("catalogo_sap:consulta"), {"centro": self.c["mttu"].pk})
+        self.assertEqual(r.context["pagina"].paginator.count, 1)
+
 
 class EjemplosTests(TestCase):
     """Los archivos de docs/ejemplos dan lo que dice docs/fase-4b.md."""

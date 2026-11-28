@@ -170,14 +170,29 @@ Todo va en una transacción (`@transaction.atomic`). Si alguien da de alta el mi
 
 La búsqueda acepta código (empieza con), descripción o No. Parte (contiene), más un filtro por Centro. Son 50 por página.
 
-Los Centros de cada material salen con `Prefetch`. En lugar de una consulta por material (50 consultas), Django hace **una** para los 50:
+**Materiales: un renglón por Material + Centro** (pedido de Dave). Si el 310001 está en MTTU y MEIX, salen dos renglones, cada uno con su grupo de compras, categoría y CeBe. Por eso la consulta parte de `MaterialCentro`, no de `MaterialSAP`:
+
+```python
+MaterialCentro.objects.filter(material__es_servicio=False) \
+    .select_related("centro", "material__creado_por", "material__importacion") \
+    .order_by("material__codigo", "centro__codigo")
+```
+
+`select_related` convierte cada relación en un `JOIN`, así que la página completa es **una** consulta (más el `COUNT` del paginador):
 
 ```sql
-SELECT ... FROM "catalogo_sap_materialcentro"
-INNER JOIN "catalogos_centro" ON ...
-WHERE "catalogo_sap_materialcentro"."material_id" IN (12, 13, 14, ...)
-ORDER BY "catalogos_centro"."codigo";
+SELECT "catalogo_sap_materialcentro".*, "catalogo_sap_materialsap".*, "catalogos_centro".*, ...
+FROM "catalogo_sap_materialcentro"
+INNER JOIN "catalogos_centro" ON ("catalogo_sap_materialcentro"."centro_id" = "catalogos_centro"."id")
+INNER JOIN "catalogo_sap_materialsap" ON ("catalogo_sap_materialcentro"."material_id" = "catalogo_sap_materialsap"."id")
+LEFT OUTER JOIN "catalogo_sap_importacion" ON (...)
+INNER JOIN "usuarios_usuario" ON (...)
+WHERE NOT "catalogo_sap_materialsap"."es_servicio"
+ORDER BY "catalogo_sap_materialsap"."codigo" ASC, "catalogos_centro"."codigo" ASC
+LIMIT 50;
 ```
+
+El filtro por Centro agrega `AND "catalogo_sap_materialcentro"."centro_id" = 1`. Los **servicios** siguen con un renglón por código, porque no tienen Centro.
 
 ## 5. Ejercicios en `psql`
 
@@ -217,8 +232,9 @@ GROUP BY mensaje ORDER BY 2 DESC;
 - Encabezados faltantes.
 - Permisos.
 - La consulta separa materiales y servicios.
+- Materiales: un renglón por Material + Centro.
 
-En total pasan 123 pruebas.
+En total pasan 124 pruebas.
 
 ## 7. Pendiente para la fase 5
 
