@@ -19,6 +19,7 @@ cd C:\proyectos\WebDM_v0
 git fetch origin
 git checkout fase-4b
 git pull
+pip install -r requirements.txt   # openpyxl, para exportar a Excel
 python manage.py migrate      # catálogo en importaciones, código único por catálogo, datos por Centro
 python manage.py datos_demo   # agrega ZSA, UMB SER y H, y el grupo de artículos SER01
 python manage.py test
@@ -219,6 +220,21 @@ ALTER TABLE "catalogo_sap_materialsap" ADD COLUMN "partida_origen_id" bigint NUL
 ALTER TABLE "catalogo_sap_materialcentro" ADD COLUMN "almacen" varchar(20) DEFAULT '' NOT NULL;
 ```
 
+### Exportar
+
+El botón **Exportar ▾** de los dos catálogos exporta **todo lo que dejan los filtros** (todas las páginas, no solo 50), con las mismas columnas y en el mismo orden que la pantalla. El código vive en `catalogo_sap/exportar.py`; la vista lo llama cuando la URL trae `?exportar=…`.
+
+| Opción | Qué hace |
+| --- | --- |
+| Copiar al portapapeles | `static/js/exportar.js` pide el texto con tabuladores (`exportar=portapapeles`) y lo copia. Al pegar en Excel cada dato cae en su celda. |
+| Archivo .txt | Separado por tabuladores, UTF-8 con BOM. |
+| Archivo .csv | Separado por comas; un dato con coma va entre comillas (`"FILTRO, DE AIRE"`). UTF-8 con BOM para que Excel lea bien los acentos y la Ñ. |
+| Excel (.xlsx) | Con `openpyxl` (nueva dependencia: `pip install -r requirements.txt`). Encabezados en negritas y fijos. |
+
+TXT, CSV y portapapeles usan `StreamingHttpResponse` y `.iterator(chunk_size=2000)`: Django manda el archivo en pedazos mientras PostgreSQL lo entrega de 2,000 en 2,000 renglones, sin cargar todo a memoria. El SQL es el mismo `SELECT … JOIN … WHERE` de la consulta, pero sin `LIMIT`.
+
+El portapapeles del navegador solo se puede usar en `https` o en `localhost`. Si WebDM corre por `http` en la red de la empresa, `exportar.js` usa el método antiguo (un cuadro de texto oculto y `execCommand("copy")`).
+
 ## 5. Ejercicios en `psql`
 
 ```sql
@@ -257,10 +273,11 @@ GROUP BY mensaje ORDER BY 2 DESC;
 - Encabezados faltantes.
 - Permisos.
 - La consulta separa materiales y servicios.
+- Exportar a portapapeles, TXT, CSV y Excel, respetando los filtros.
 - Materiales: un renglón por Material + Centro.
 - El alta en WebDM llena todas las columnas; filtros por columna (sin Almacén, UMB, Grupo de compras ni CeBe); ficha del material con imágenes visible para cualquier usuario.
 
-En total pasan 128 pruebas.
+En total pasan 132 pruebas.
 
 ## 7. Pendiente para la fase 5
 

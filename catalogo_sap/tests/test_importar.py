@@ -297,3 +297,49 @@ class CatalogoCompletoTests(TestCase):
         self.assertEqual(self.client.get(reverse("solicitudes:ver_imagen", args=[imagen.pk])).status_code, 200)
         r = self.client.get(reverse("catalogo_sap:material", args=[MaterialSAP.objects.get(codigo="200002").pk]))
         self.assertContains(r, "Sin imágenes")
+
+
+class ExportarTests(TestCase):
+    """Pedido de Dave: exportar lo filtrado al portapapeles, TXT, CSV y Excel."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.c = catalogos_para_importar()
+        cls.dm = crear_usuario("dm", "DM")
+        importar(txt("123456\tFiltro, de aire\tMTTU\tZRA\tPZA\tFA-1\t", "222222\tBALATA\tMTTU\tZRA\tPZA\t\t"), "m.txt", cls.dm)
+        importar(txt("555555\tMANO DE OBRA\tZSA\tSER", encabezados=ENCABEZADOS_SERVICIOS), "s.txt", cls.dm, "SERVICIOS")
+
+    def setUp(self):
+        self.client.force_login(self.dm)
+
+    def baja(self, url, **params):
+        r = self.client.get(url, params)
+        return r, b"".join(r.streaming_content).decode("utf-8") if r.streaming else r.content
+
+    def test_txt_con_tabuladores_respeta_filtros(self):
+        r, texto = self.baja(reverse("catalogo_sap:consulta"), exportar="txt", descripcion="filtro")
+        self.assertIn('attachment; filename="catalogo-materiales-', r["Content-Disposition"])
+        lineas = texto.lstrip("﻿").split("\r\n")
+        self.assertTrue(lineas[0].startswith("Código SAP\tTipo de material\tCentro\tDescripción"))
+        self.assertEqual(lineas[1].split("\t")[:4], ["123456", "ZRA", "MTTU", "FILTRO, DE AIRE"])
+        self.assertEqual(len([l for l in lineas if l]), 2)  # encabezado + 1: el filtro aplica
+
+    def test_portapapeles_sin_bom_y_csv_con_comillas(self):
+        _, texto = self.baja(reverse("catalogo_sap:consulta"), exportar="portapapeles")
+        self.assertTrue(texto.startswith("Código SAP\t"))
+        _, texto = self.baja(reverse("catalogo_sap:consulta"), exportar="csv")
+        self.assertIn('123456,ZRA,MTTU,"FILTRO, DE AIRE"', texto)
+
+    def test_excel(self):
+        from openpyxl import load_workbook
+
+        r, contenido = self.baja(reverse("catalogo_sap:servicios"), exportar="xlsx")
+        hoja = load_workbook(BytesIO(contenido)).active
+        self.assertEqual([c.value for c in hoja[1]], ["Código SAP", "Descripción", "Tipo de material", "UMB",
+                                                    "Grupo de artículos", "Origen"])
+        self.assertEqual([c.value for c in hoja[2]][:5], ["555555", "MANO DE OBRA", "ZSA", "SER", "GA1"])
+        self.assertEqual(hoja.max_row, 2)
+
+    def test_menu_exportar_conserva_filtros(self):
+        r = self.client.get(reverse("catalogo_sap:consulta"), {"marca": "x", "pagina": "1"})
+        self.assertContains(r, "marca=x&amp;exportar=xlsx")

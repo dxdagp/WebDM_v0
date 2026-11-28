@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from catalogos.models import Centro
 
+from . import exportar
 from .importar import COLUMNAS, ArchivoInvalido, importar
 from .models import Importacion, MaterialCentro, MaterialSAP
 
@@ -64,20 +65,13 @@ def _sin_pagina(request):
     """Los filtros actuales como texto de URL, para que la paginación no los pierda."""
     filtros = request.GET.copy()
     filtros.pop("pagina", None)
+    filtros.pop("exportar", None)
     return filtros.urlencode()
 
 
-@login_required
-def consulta(request, catalogo="materiales"):
-    """Catálogo de consulta global (Revisión 3: todos ven todos los Centros).
-
-    Materiales y servicios se consultan por separado (pedido de Dave). Por dentro es la misma
-    tabla con la columna es_servicio; el código es único dentro de cada catálogo, no entre los dos.
-    """
-    datos_catalogo = CATALOGOS[catalogo]
-    contexto = {"catalogo": catalogo, "titulo": datos_catalogo["titulo"], "es_servicios": datos_catalogo["servicio"],
-                "puede_importar": puede_importar(request.user), "filtros_url": _sin_pagina(request)}
-    if datos_catalogo["servicio"]:
+def _filtrar(request, servicio):
+    """El queryset del catálogo con los filtros de la URL aplicados. Lo usan la consulta y la exportación."""
+    if servicio:
         # Servicios: un renglón por código (no dependen de un Centro).
         renglones = MaterialSAP.objects.filter(es_servicio=True).select_related("creado_por", "importacion")
         definicion, orden = COLUMNAS_SERVICIOS, ["codigo"]
@@ -98,12 +92,29 @@ def consulta(request, catalogo="materiales"):
                 renglones = renglones.filter(**{busqueda: valor})
                 hay_filtros = True
         columnas.append({"nombre": nombre, "titulo": titulo, "filtra": bool(busqueda), "valor": valor})
-    contexto.update(
-        columnas=columnas, hay_filtros=hay_filtros, centros=Centro.objects.order_by("codigo"),
-        origenes=MaterialSAP.Origen.choices,
-        pagina=Paginator(renglones.order_by(*orden), 50).get_page(request.GET.get("pagina")),
-    )
-    return render(request, "catalogo_sap/consulta.html", contexto)
+    return renglones.order_by(*orden), columnas, hay_filtros
+
+
+@login_required
+def consulta(request, catalogo="materiales"):
+    """Catálogo de consulta global (Revisión 3: todos ven todos los Centros).
+
+    Materiales y servicios se consultan por separado (pedido de Dave). Por dentro es la misma
+    tabla con la columna es_servicio; el código es único dentro de cada catálogo, no entre los dos.
+    """
+    datos_catalogo = CATALOGOS[catalogo]
+    renglones, columnas, hay_filtros = _filtrar(request, datos_catalogo["servicio"])
+    formato = request.GET.get("exportar")
+    if formato in exportar.FORMATOS:
+        # Exporta TODO lo que dejan los filtros, no solo la página de 50.
+        return exportar.respuesta(formato, renglones, columnas, datos_catalogo["servicio"], catalogo)
+    return render(request, "catalogo_sap/consulta.html", {
+        "catalogo": catalogo, "titulo": datos_catalogo["titulo"], "es_servicios": datos_catalogo["servicio"],
+        "puede_importar": puede_importar(request.user), "filtros_url": _sin_pagina(request),
+        "columnas": columnas, "hay_filtros": hay_filtros, "centros": Centro.objects.order_by("codigo"),
+        "origenes": MaterialSAP.Origen.choices,
+        "pagina": Paginator(renglones, 50).get_page(request.GET.get("pagina")),
+    })
 
 
 @login_required

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block titulo %}{{ titulo }} · WebDM{% endblock %}
 {% block contenido %}
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
@@ -13,6 +14,16 @@
 <form method="get" id="filtros" class="d-flex gap-2 mb-2">
   <button class="btn btn-sm btn-outline-secondary">Filtrar</button>
   {% if hay_filtros %}<a class="btn btn-sm btn-link" href="?">Quitar filtros</a>{% endif %}
+  {# Exportar: lo que dejan los filtros, todas las páginas. Un <details> abre y cierra el menú sin JavaScript. #}
+  <details class="wd-exportar">
+    <summary class="btn btn-sm btn-outline-secondary">Exportar ▾</summary>
+    <div class="wd-exportar-menu">
+      <button type="button" data-portapapeles="?{{ filtros_url }}&amp;exportar=portapapeles">Copiar al portapapeles (tabuladores)</button>
+      <a href="?{{ filtros_url }}&amp;exportar=txt">Archivo .txt (tabuladores)</a>
+      <a href="?{{ filtros_url }}&amp;exportar=csv">Archivo .csv</a>
+      <a href="?{{ filtros_url }}&amp;exportar=xlsx">Excel (.xlsx)</a>
+    </div>
+  </details>
   <span class="small text-secondary align-self-center">Escribe en el renglón de filtros (bajo los encabezados) y presiona Enter.{% if not es_servicios %} Clic en el código para ver el material completo.{% endif %}</span>
 </form>
 <div class="wd-tabla-caja">
@@ -84,3 +95,4 @@
 </div>
 {% include "catalogo_sap/_paginas.html" with pagina=pagina %}
 {% endblock %}
+{% block scripts %}<script src="{% static 'js/exportar.js' %}"></script>{% endblock %}
