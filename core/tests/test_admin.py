@@ -77,3 +77,13 @@ class AdminTests(TestCase):
         self.assertContains(r, "CANCELADA POR VENCIMIENTO")
         self.assertContains(r, "Sistema")
         self.assertNotContains(r, "<label>ID:</label>", html=False)
+
+    def test_importacion_de_solo_lectura(self):
+        """Pedido de Dave: en una importación no se edita nada (ni el catálogo) ni se agregan errores."""
+        self.client.force_login(self.admin)
+        imp = Importacion.objects.get()
+        r = self.client.get(reverse("admin:catalogo_sap_importacion_change", args=[imp.pk]))
+        self.assertNotContains(r, 'name="catalogo"')
+        self.assertNotContains(r, 'id="detalle_errores-empty"')  # la fila en blanco para agregar errores
+        self.assertNotContains(r, 'name="_save"')
+        self.assertEqual(self.client.post(reverse("admin:catalogo_sap_importacion_delete", args=[imp.pk])).status_code, 403)

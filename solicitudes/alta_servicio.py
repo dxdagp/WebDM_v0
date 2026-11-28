@@ -20,6 +20,7 @@ from django import forms
 from django.db import transaction
 from django.utils import timezone
 
+from catalogo_sap import historial
 from catalogo_sap.models import MaterialSAP
 from catalogos.models import GrupoArticulos, TipoServicio, UMB  # noqa: F401
 
@@ -285,9 +286,10 @@ def terminar(usuario, partida, codigo):
     d = partida.servicio
     d.codigo_sap = codigo
     d.save(update_fields=["codigo_sap"])
-    MaterialSAP.objects.create(
+    servicio = MaterialSAP.objects.create(
         codigo=codigo, descripcion=d.descripcion, tipo_material=TIPO, umb=d.umb.codigo if d.umb else "",
         grupo_articulos=d.grupo_articulos.codigo if d.grupo_articulos else "", es_servicio=True,
         origen=MaterialSAP.Origen.WEBDM, folio_origen=partida.solicitud.folio or "", partida_origen=partida,
         creado_por=usuario,
     )
+    historial.alta_webdm(servicio, usuario, partida)

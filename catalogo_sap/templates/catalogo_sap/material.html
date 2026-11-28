@@ -4,10 +4,11 @@
 {% block contenido %}
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
   <div>
-    <div class="text-secondary small"><a href="{% url 'catalogo_sap:consulta' %}">Catálogo de materiales</a> / {{ m.codigo }}</div>
+    <div class="text-secondary small">{% if m.es_servicio %}<a href="{% url 'catalogo_sap:servicios' %}">Catálogo de servicios</a>{% else %}<a href="{% url 'catalogo_sap:consulta' %}">Catálogo de materiales</a>{% endif %} / {{ m.codigo }}</div>
     <h1 class="h4 fw-bold mb-0">{{ m.codigo }} · {{ m.descripcion }}</h1>
   </div>
-  <div class="small">{% include "catalogo_sap/_origen.html" %}</div>
+  <div class="d-flex align-items-center gap-2 small">{% include "catalogo_sap/_origen.html" %}
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'catalogo_sap:historial' m.pk %}">Historial</a></div>
 </div>
 
 <div class="row g-4">

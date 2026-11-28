@@ -23,6 +23,7 @@ from django import forms
 from django.db import transaction
 from django.utils import timezone
 
+from catalogo_sap import historial
 from catalogo_sap.models import MaterialCentro, MaterialSAP
 from catalogos.models import Almacen, Centro, GrupoArticulos, GrupoCompras, UbicacionRefaccion
 
@@ -468,6 +469,7 @@ def finalizar_partidas(usuario, partidas):
         antes = getattr(destino, atributo)
         setattr(destino, atributo, int(d.valor_nuevo) if d.campo == C.ANIO_MODELO else d.valor_nuevo)
         destino.save(update_fields=[atributo])
+        historial.modificacion_webdm(d.material, usuario, p, C(d.campo).label, "" if antes is None else str(antes), d.valor_nuevo)
         anterior = p.estado
         p.estado = E.TERMINADA
         p.save(update_fields=["estado", "actualizada"])

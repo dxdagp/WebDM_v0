@@ -134,6 +134,21 @@ def material(request, pk):
 
 
 @login_required
+def historial(request, pk):
+    """Bitácora de un material o servicio: alta, ampliaciones y modificaciones, con folio y usuarios.
+
+    SQL (una sola consulta gracias a select_related, que agrega los JOIN):
+        SELECT h.*, sol.*, usr.* FROM catalogo_sap_historialmaterial h
+        LEFT JOIN usuarios_usuario sol ON sol.id = h.solicitante_id
+        LEFT JOIN usuarios_usuario usr ON usr.id = h.usuario_id
+        WHERE h.material_id = %s ORDER BY h.fecha, h.id
+    """
+    m = get_object_or_404(MaterialSAP, pk=pk)
+    movimientos = m.historial.select_related("solicitante", "usuario").order_by("fecha", "id")
+    return render(request, "catalogo_sap/historial.html", {"m": m, "movimientos": movimientos})
+
+
+@login_required
 def importar_txt(request):
     if not puede_importar(request.user):
         raise PermissionDenied("Importar el catálogo SAP es solo para ADMIN y DM.")

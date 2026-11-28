@@ -20,6 +20,7 @@ from django import forms
 from django.db import transaction
 from django.utils import timezone
 
+from catalogo_sap import historial
 from catalogo_sap.models import MaterialCentro, MaterialSAP
 from catalogos.models import Almacen, Centro, GrupoCompras, Planificador
 
@@ -473,13 +474,15 @@ def finalizar_partidas(usuario, partidas):
         if material is None:
             raise AccionNoPermitida(f"Partida {p.numero}: el material {a.codigo_sap} ya no está en el catálogo. Exclúyela.")
         modelo = MaterialCentro.objects.filter(material=material, centro=a.centro_origen).first()
-        MaterialCentro.objects.get_or_create(material=material, centro=p.centro, defaults={
+        _, nuevo = MaterialCentro.objects.get_or_create(material=material, centro=p.centro, defaults={
             "grupo_compras": a.grupo_compras.codigo if a.grupo_compras else "",
             # La categoría de valoración no se captura en AMPL: se copia del Centro modelo.
             "categoria_valoracion": modelo.categoria_valoracion if modelo else "",
             "almacen": a.almacen_destino.codigo if a.almacen_destino else "",
             "cebe": p.centro.centro_beneficio,
         })
+        if nuevo:  # si ya existía (p. ej. llegó por una importación), no es una ampliación de este folio
+            historial.ampliacion_webdm(material, usuario, p)
         anterior = p.estado
         p.estado = E.TERMINADA
         p.save(update_fields=["estado", "actualizada"])

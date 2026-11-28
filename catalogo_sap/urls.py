@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.consulta, name="consulta"),  # = materiales
     path("servicios/", views.consulta, {"catalogo": "servicios"}, name="servicios"),
     path("material/<int:pk>/", views.material, name="material"),
+    path("material/<int:pk>/historial/", views.historial, name="historial"),
     path("importar/", views.importar_txt, name="importar"),
     path("importar/<int:pk>/", views.importacion, name="importacion"),
 ]

@@ -122,6 +122,9 @@ class FlujoDMTests(Base):
         mc = MaterialCentro.objects.get(material=self.material, centro=self.c["meix"])
         # Pedido de Dave: la ampliación agrega el Centro al catálogo de materiales.
         self.assertEqual((mc.almacen, mc.grupo_compras, mc.cebe, mc.categoria_valoracion), ("RC01", "G05", "CEBE-MEIX", "CV1"))
+        h = self.material.historial.get()
+        self.assertEqual((h.tipo, h.folio, h.centro, h.usuario), ("AMPLIACION", s.folio, "MEIX", self.dm))
+        self.assertFalse(otro.historial.exists())  # la partida 20 se excluyó
         s.refresh_from_db()
         self.assertEqual(s.estado, "TERMINADA")
 

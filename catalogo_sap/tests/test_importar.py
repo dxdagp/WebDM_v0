@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from catalogo_sap.importar import ArchivoInvalido, importar
-from catalogo_sap.models import Importacion, MaterialCentro, MaterialSAP
+from catalogo_sap.models import HistorialMaterial, Importacion, MaterialCentro, MaterialSAP
 from catalogos.models import UMB, GrupoArticulos, GrupoCompras, TipoMaterial
 from solicitudes.tests.datos import crear_catalogos, crear_usuario
 
@@ -68,6 +68,14 @@ class ImportarTests(TestCase):
         self.assertEqual(m.grupo_articulos, "GA1")
         mc = m.centros.get(centro__codigo="MTTU")
         self.assertEqual((mc.grupo_compras, mc.categoria_valoracion, mc.cebe), ("G01", "CV1", "CEBE-MTTU"))
+        # Historial: el primer Centro es el alta y el segundo una ampliación, los dos de esta importación.
+        self.assertEqual(list(m.historial.values_list("tipo", "centro", "origen", "folio", "importacion", "usuario")),
+                         [("ALTA", "MTTU", "IMPORT", "sap.txt", imp.pk, self.dm.pk),
+                          ("AMPLIACION", "MEIX", "IMPORT", "sap.txt", imp.pk, self.dm.pk)])
+        # Otra importación que agrega un Centro a un material que ya existía: solo ampliación.
+        MaterialCentro.objects.filter(centro__codigo="MEIX").delete()
+        self.importa("123456\tFiltro de aire\tMEIX\tZRA\tPZA\tFA-1\tx")
+        self.assertEqual(list(m.historial.values_list("tipo", flat=True)), ["ALTA", "AMPLIACION", "AMPLIACION"])
 
     def test_buenos_entran_aunque_otros_fallen(self):
         imp = self.importa(
@@ -137,6 +145,7 @@ class ImportarTests(TestCase):
         self.assertEqual((imp.importados, imp.errores), (2, 1))
         self.assertEqual(MaterialSAP.objects.filter(es_servicio=True).count(), 2)
         self.assertFalse(MaterialCentro.objects.exists())  # los servicios no dependen de un Centro
+        self.assertEqual(sorted(HistorialMaterial.objects.values_list("tipo", "centro")), [("ALTA", ""), ("ALTA", "")])
         # Un ZSA en el catálogo de materiales es error.
         imp = self.importa("777777\tMANO DE OBRA\tMTTU\tZSA\tSER\t\t")
         self.assertIn("catálogo de servicios", self.errores(imp)[0][1])
@@ -311,6 +320,16 @@ class CatalogoCompletoTests(TestCase):
         self.assertEqual(self.client.get(reverse("solicitudes:ver_imagen", args=[imagen.pk])).status_code, 200)
         r = self.client.get(reverse("catalogo_sap:material", args=[MaterialSAP.objects.get(codigo="200002").pk]))
         self.assertContains(r, "Sin imágenes")
+
+    def test_historial_del_material(self):
+        m = MaterialSAP.objects.get(codigo="100001")
+        self.client.force_login(self.otro)
+        r = self.client.get(reverse("catalogo_sap:material", args=[m.pk]))
+        self.assertContains(r, reverse("catalogo_sap:historial", args=[m.pk]))
+        r = self.client.get(reverse("catalogo_sap:historial", args=[m.pk]))
+        self.assertContains(r, "Historial de 100001")
+        self.assertContains(r, "<td>Alta</td>", html=False)
+        self.assertContains(r, m.folio_origen)
 
 
 class ExportarTests(TestCase):

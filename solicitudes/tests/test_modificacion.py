@@ -150,6 +150,11 @@ class FlujoTests(Base):
         self.assertEqual(s.estado, "TERMINADA")
         fin = Evento.objects.get(partida_id=ids[0], tipo=Evento.Tipo.TERMINACION)
         self.assertEqual(fin.detalle, {"campo": "Marca", "antes": "FORD", "despues": "NISSAN"})
+        # Historial del material (pedido de Dave): cada dato modificado, con su folio y quién lo atendió.
+        h = self.material.historial.get(campo="Marca")
+        self.assertEqual((h.tipo, h.folio, h.antes, h.despues, h.solicitante, h.usuario),
+                         ("MODIFICACION", s.folio, "FORD", "NISSAN", s.solicitante, self.dm))
+        self.assertEqual(self.material.historial.get(campo="Grupo de compras").centro, "MTTU")
 
     def test_exportar_un_tipo_a_la_vez(self):
         self.post(self.val, "enviar", self.renglon())
