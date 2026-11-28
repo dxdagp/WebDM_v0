@@ -205,6 +205,36 @@ Ese `LIKE '%…%'` no puede usar un índice normal (B-tree) porque empieza con `
 
 Esperar 400 ms después de la última tecla (en inglés, *debounce*) evita mandar una consulta por cada letra.
 
+## 4b. Ajustes de Dave a la tabla de captura
+
+**Nuevo orden de columnas** (reemplaza el de la Revisión 3, sección 7.2). Es también el orden del pegado desde Excel:
+
+Partida · Tipo de Material · Centro · Descripción · UMB · Grupo de compras · Grupo de artículos · Categoría de valoración · Ubicación · No. Parte Original · Tipo de Unidad · Marca · Versión · Año modelo · Compatibilidad · Almacén · CeBe · Imágenes · Estado · Acción
+
+Se cambia en cuatro lugares que deben coincidir:
+
+| Archivo | Qué ordena |
+| --- | --- |
+| `solicitudes/forms.py` | El orden de los campos de `PartidaAltaForm` (también el orden de la ficha). |
+| `_fila_amat.html` | Las celdas de cada renglón. |
+| `capturar_amat.html` y `corregir.html` | Los encabezados. |
+| `static/js/captura.js` | `COLUMNAS`, el orden del pegado. |
+
+**Almacén editable.** Antes era automático. Ahora es una lista, con dos reglas:
+- Al elegir el Centro se propone el almacén predeterminado. Si el Centro no tiene predeterminado, se propone el primero por código.
+- Si eliges uno, `clean()` revisa que sea **de ese Centro** ("Este almacén no pertenece al Centro de la partida").
+
+El SQL del almacén propuesto:
+
+```sql
+SELECT * FROM catalogos_almacen
+WHERE centro_id = 3 AND activo
+ORDER BY predeterminado DESC, codigo ASC
+LIMIT 1;   -- TRUE va antes que FALSE con DESC
+```
+
+**Aspecto de Excel.** Cuadrícula gris en todas las celdas, encabezados centrados, celdas sin cajas, borde verde en la celda activa y celdas vacías en blanco, en lugar de "---------" (`empty_label=""`).
+
 ## 5. Ejercicios en `psql`
 
 ```sql

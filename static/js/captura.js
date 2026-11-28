@@ -22,11 +22,11 @@
   var prefijo = total.name.replace("-TOTAL_FORMS", ""); // normalmente "form"
   var datos = JSON.parse(document.getElementById("datos-automaticos").textContent);
 
-  // Columnas que se pueden pegar, en el orden visual de la Revisión 3.
-  // Partida y las columnas automáticas no forman parte del pegado.
+  // Columnas que se pueden pegar, en el orden visual que definió Dave (28-nov-2026).
+  // Partida, Tipo de Material, CeBe, Imágenes, Estado y Acción no forman parte del pegado.
   var COLUMNAS = [
-    "centro", "descripcion", "ubicacion", "no_parte_original", "tipo_unidad", "marca", "version",
-    "anio_modelo", "compatibilidad", "umb", "grupo_articulos", "categoria_valoracion", "grupo_compras",
+    "centro", "descripcion", "umb", "grupo_compras", "grupo_articulos", "categoria_valoracion", "ubicacion",
+    "no_parte_original", "tipo_unidad", "marca", "version", "anio_modelo", "compatibilidad", "almacen",
   ];
 
   function filas() { return Array.prototype.slice.call(cuerpo.querySelectorAll("tr.wd-fila")); }
@@ -37,7 +37,6 @@
     var centro = campo(fila, "centro").value;
     var categoria = campo(fila, "categoria_valoracion").value;
     fila.querySelector('[data-auto="cebe"]').textContent = datos.cebe[centro] || "—";
-    fila.querySelector('[data-auto="almacen"]').textContent = datos.almacen[centro] || "—";
     fila.querySelector('[data-auto="tipo"]').textContent = datos.tipoMaterial[categoria] || "—";
   }
 
@@ -46,6 +45,9 @@
     var grupo = campo(fila, "grupo_compras");
     // Propone el grupo predeterminado del Centro si el usuario aún no eligió uno.
     if (!grupo.value && datos.grupoPredeterminado[centro]) grupo.value = datos.grupoPredeterminado[centro];
+    // Igual con el almacén: se propone el predeterminado, pero el usuario puede cambiarlo.
+    var almacen = campo(fila, "almacen");
+    if (!almacen.value && datos.almacenPredeterminado[centro]) almacen.value = datos.almacenPredeterminado[centro];
     actualizarAutomaticos(fila);
   }
 
@@ -81,14 +83,15 @@
   function elegirOpcion(select, texto, fila) {
     var buscado = texto.trim().toUpperCase();
     if (!buscado) { select.value = ""; return; }
-    var centro = select.name.endsWith("grupo_compras") ? campo(fila, "centro") : null;
+    var porCentro = select.name.endsWith("grupo_compras") || select.name.endsWith("almacen");
+    var centro = porCentro ? campo(fila, "centro") : null;
     var centroTexto = centro && centro.selectedIndex > 0 ? centro.options[centro.selectedIndex].text : "";
     var candidatos = Array.prototype.filter.call(select.options, function (op) {
       if (!op.value) return false;
       var partes = op.text.toUpperCase().split(" · "); // las opciones se ven como "CODIGO · DESCRIPCIÓN"
       return op.text.toUpperCase() === buscado || partes.indexOf(buscado) !== -1;
     });
-    // En Grupo de compras el mismo código puede existir en varios Centros: preferimos el del renglón.
+    // En Grupo de compras y Almacén el mismo código puede existir en varios Centros: preferimos el del renglón.
     var elegido = candidatos.filter(function (op) { return !centroTexto || op.text.indexOf(centroTexto + " · ") === 0; })[0]
       || candidatos[0];
     select.value = elegido ? elegido.value : "";

@@ -223,3 +223,27 @@ class BorradorVacioTests(BaseCaptura):
         r = self.post("enviar")
         self.assertContains(r, "Agrega al menos una partida")
         self.assertFalse(Solicitud.objects.exists())
+
+
+class AlmacenEditableTests(BaseCaptura):
+    """Pedido de Dave: el almacén se puede elegir, pero tiene que ser del Centro de la partida."""
+
+    def test_almacen_de_otro_centro_no(self):
+        otro = Almacen.objects.create(centro=self.meix, codigo="RC09")
+        r = self.post("guardar", self.fila(almacen=otro.pk))
+        self.assertContains(r, "no pertenece al Centro")
+        self.assertFalse(Solicitud.objects.exists())
+
+    def test_elige_otro_almacen_del_centro(self):
+        rc02 = Almacen.objects.create(centro=self.mttu, codigo="RC02")
+        self.post("guardar", self.fila(almacen=rc02.pk))
+        self.assertEqual(Partida.objects.get().alta.almacen, rc02)
+
+    def test_vacio_toma_el_predeterminado_o_el_primero(self):
+        self.post("guardar", self.fila())
+        self.assertEqual(Partida.objects.get().alta.almacen.codigo, "RC01")  # el predeterminado
+        Almacen.objects.update(predeterminado=False)
+        Almacen.objects.create(centro=self.mttu, codigo="AA01")
+        Solicitud.objects.all().delete()
+        self.post("guardar", self.fila())
+        self.assertEqual(Partida.objects.get().alta.almacen.codigo, "AA01")  # sin predeterminado: el primero

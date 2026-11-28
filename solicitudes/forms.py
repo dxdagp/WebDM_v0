@@ -33,21 +33,28 @@ class Catalogo(forms.ModelChoiceField):
     """Lista desplegable de un catálogo, solo con valores activos, opcional en borrador."""
 
     def __init__(self, queryset, **kwargs):
-        super().__init__(queryset=queryset.filter(activo=True), required=False, **kwargs)
+        # empty_label="": la opción vacía se ve como celda en blanco (como Excel), no "---------".
+        super().__init__(queryset=queryset.filter(activo=True), required=False, empty_label="", **kwargs)
 
 
-# Orden EXACTO de la Revisión 3 (sección 7.2) para que el pegado desde Excel sea predecible.
-# Las columnas automáticas (CeBe, Tipo de Material, Almacén) no se capturan ni se pegan.
+# Orden de columnas definido por Dave (28-nov-2026), que reemplaza al de la Revisión 3 (7.2).
+# Es también el orden del pegado desde Excel (static/js/captura.js, COLUMNAS).
+# Tipo de Material y CeBe son automáticos: no se capturan ni se pegan.
 CAMPOS_OBLIGATORIOS_ENVIO = [
-    "centro", "descripcion", "ubicacion", "no_parte_original", "tipo_unidad", "marca", "version",
-    "anio_modelo", "umb", "grupo_articulos", "categoria_valoracion", "grupo_compras",
+    "centro", "descripcion", "umb", "grupo_compras", "grupo_articulos", "categoria_valoracion",
+    "ubicacion", "no_parte_original", "tipo_unidad", "marca", "version", "anio_modelo",
 ]
 
 
 class PartidaAltaForm(forms.Form):
+    # El orden de declaración es el orden en que se dibujan los campos en la ficha.
     numero = forms.IntegerField(min_value=1, required=False, label="Partida")
-    centro = forms.ModelChoiceField(queryset=Centro.objects.none(), required=False, label="Centro")
+    centro = forms.ModelChoiceField(queryset=Centro.objects.none(), required=False, label="Centro", empty_label="")
     descripcion = CampoTextoSAP(label="Descripción técnica del material")
+    umb = Catalogo(UMB.objects.all(), label="Unidad de medida base")
+    grupo_compras = Catalogo(GrupoCompras.objects.select_related("centro"), label="Grupo de compras")
+    grupo_articulos = Catalogo(GrupoArticulos.objects.all(), label="Grupo de artículos")
+    categoria_valoracion = Catalogo(CategoriaValoracion.objects.all(), label="Categoría de valoración")
     ubicacion = Catalogo(UbicacionRefaccion.objects.all(), label="Ubicación de la refacción")
     no_parte_original = CampoTextoSAP(label="No. Parte Original")
     tipo_unidad = CampoTextoSAP(label="Tipo de Unidad")
@@ -58,10 +65,9 @@ class PartidaAltaForm(forms.Form):
         error_messages={"invalid": "Debe tener 4 dígitos.", "min_value": "Año no válido.", "max_value": "Año no válido."},
     )
     compatibilidad = CampoTextoSAP(label="Compatibilidad entre unidades")
-    umb = Catalogo(UMB.objects.all(), label="Unidad de medida base")
-    grupo_articulos = Catalogo(GrupoArticulos.objects.all(), label="Grupo de artículos")
-    categoria_valoracion = Catalogo(CategoriaValoracion.objects.all(), label="Categoría de valoración")
-    grupo_compras = Catalogo(GrupoCompras.objects.select_related("centro"), label="Grupo de compras")
+    # Editable desde el 28-nov-2026 (pedido de Dave). Si se deja vacío, el servidor pone
+    # el almacén predeterminado del Centro.
+    almacen = Catalogo(Almacen.objects.select_related("centro"), label="Almacén")
 
     def __init__(self, *args, centros=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -81,8 +87,12 @@ class PartidaAltaForm(forms.Form):
         centro, grupo = datos.get("centro"), datos.get("grupo_compras")
         if centro and grupo and grupo.centro_id != centro.id:
             self.add_error("grupo_compras", "Este grupo de compras no pertenece al Centro de la partida.")
-        if centro and not Almacen.objects.filter(centro=centro, predeterminado=True, activo=True).exists():
-            self.add_error("centro", "Este Centro no tiene almacén predeterminado; avisa a ADMIN.")
+        almacen = datos.get("almacen")
+        if centro and almacen and almacen.centro_id != centro.id:
+            # La relación Centro–Almacén: el almacén tiene que ser de ESE Centro.
+            self.add_error("almacen", "Este almacén no pertenece al Centro de la partida.")
+        if centro and not almacen and not Almacen.objects.filter(centro=centro, activo=True).exists():
+            self.add_error("almacen", "Este Centro no tiene almacenes activos; avisa a ADMIN.")
         return datos
 
     def faltantes(self):

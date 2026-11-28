@@ -15,9 +15,21 @@ from .folios import siguiente_folio
 from .models import DetalleAlta, Evento, Flujo, ImagenPartida, Partida, Solicitud
 
 CAMPOS_DETALLE = [
-    "descripcion", "ubicacion", "no_parte_original", "tipo_unidad", "marca", "version", "anio_modelo",
-    "compatibilidad", "umb", "grupo_articulos", "categoria_valoracion", "grupo_compras",
+    "descripcion", "umb", "grupo_compras", "grupo_articulos", "categoria_valoracion", "ubicacion",
+    "no_parte_original", "tipo_unidad", "marca", "version", "anio_modelo", "compatibilidad", "almacen",
 ]
+
+
+def almacen_predeterminado(centro):
+    """El almacén que se propone para un Centro: el predeterminado; si no hay, el primero
+    activo por código (pedido de Dave: proponer el primer dato que aparezca).
+
+    SQL: ... WHERE centro_id = 3 AND activo ORDER BY predeterminado DESC, codigo LIMIT 1
+    (en PostgreSQL TRUE va después de FALSE, por eso DESC pone primero al predeterminado).
+    """
+    if not centro:
+        return None
+    return Almacen.objects.filter(centro=centro, activo=True).order_by("-predeterminado", "codigo").first()
 
 
 def puede_capturar(usuario):
@@ -52,10 +64,8 @@ def _reemplazar_partidas(solicitud, formset):
             setattr(detalle, c, datos.get(c))
         # Campos automáticos (no se capturan):
         detalle.tipo_material = detalle.categoria_valoracion.tipo_material if detalle.categoria_valoracion else None
-        detalle.almacen = (
-            Almacen.objects.filter(centro=partida.centro, predeterminado=True, activo=True).first()
-            if partida.centro else None
-        )
+        if detalle.almacen is None:  # vacío = el predeterminado del Centro
+            detalle.almacen = almacen_predeterminado(partida.centro)
         detalle.save()
     for sobrante in existentes.values():
         borrar_archivos_al_confirmar(sobrante.imagenes.all())
@@ -194,6 +204,9 @@ def guardar_correcciones(usuario, forms, solicitud):
         alta = partida.alta
         nuevos = {c: datos.get(c) for c in CAMPOS_DETALLE}
         nuevos["centro"] = datos.get("centro")
+        # Almacén vacío = el propuesto del Centro. Se resuelve ANTES de comparar para no
+        # registrar un cambio falso ("RC01 → vacío") cuando en realidad sigue igual.
+        nuevos["almacen"] = nuevos["almacen"] or almacen_predeterminado(nuevos["centro"])
         for campo, nuevo in nuevos.items():
             destino = partida if campo == "centro" else alta
             actual = getattr(destino, campo)
@@ -206,12 +219,10 @@ def guardar_correcciones(usuario, forms, solicitud):
             )
             setattr(destino, campo, nuevo)
             cambios += 1
-        # Los automáticos se recalculan siempre en el servidor.
+        # Tipo de Material se recalcula siempre en el servidor; el almacén vacío toma el predeterminado.
         alta.tipo_material = alta.categoria_valoracion.tipo_material if alta.categoria_valoracion else None
-        alta.almacen = (
-            Almacen.objects.filter(centro=partida.centro, predeterminado=True, activo=True).first()
-            if partida.centro else None
-        )
+        if alta.almacen is None:
+            alta.almacen = almacen_predeterminado(partida.centro)
         partida.save()
         alta.save()
     return cambios

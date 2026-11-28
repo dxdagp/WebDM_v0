@@ -1,10 +1,14 @@
-{# Un renglón de la tabla AMAT_ZRA, en el orden EXACTO de la Revisión 3 (sección 7.2). #}
+{# Un renglón de la tabla AMAT_ZRA, en el orden de columnas que definió Dave (28-nov-2026). #}
 {# Se usa en la captura (fase 2) y en la corrección (fase 3, variable `correccion`). #}
 <tr class="wd-fila">
   {% include "solicitudes/_celda.html" with campo=form.numero clase="auto" %}
+  <td class="auto" data-auto="tipo">—</td>
   {% include "solicitudes/_celda.html" with campo=form.centro %}
-  <td class="auto" data-auto="cebe">—</td>
   {% include "solicitudes/_celda.html" with campo=form.descripcion clase="ancha" %}
+  {% include "solicitudes/_celda.html" with campo=form.umb %}
+  {% include "solicitudes/_celda.html" with campo=form.grupo_compras %}
+  {% include "solicitudes/_celda.html" with campo=form.grupo_articulos %}
+  {% include "solicitudes/_celda.html" with campo=form.categoria_valoracion %}
   {% include "solicitudes/_celda.html" with campo=form.ubicacion %}
   {% include "solicitudes/_celda.html" with campo=form.no_parte_original %}
   {% include "solicitudes/_celda.html" with campo=form.tipo_unidad %}
@@ -12,17 +16,13 @@
   {% include "solicitudes/_celda.html" with campo=form.version %}
   {% include "solicitudes/_celda.html" with campo=form.anio_modelo %}
   {% include "solicitudes/_celda.html" with campo=form.compatibilidad %}
-  {% include "solicitudes/_celda.html" with campo=form.umb %}
-  {% include "solicitudes/_celda.html" with campo=form.grupo_articulos %}
-  {% include "solicitudes/_celda.html" with campo=form.categoria_valoracion %}
-  <td class="auto" data-auto="tipo">—</td>
-  <td class="auto" data-auto="almacen">—</td>
-  {% include "solicitudes/_celda.html" with campo=form.grupo_compras %}
+  {% include "solicitudes/_celda.html" with campo=form.almacen %}
+  <td class="auto" data-auto="cebe">—</td>
   {# Fase 4: en la captura se eligen aquí mismo (se guardan al Guardar o Enviar). En la corrección, desde la ficha. #}
   <td class="auto wd-celda-imagenes{% if form.error_imagen %} wd-error{% endif %}">
     {% if form.guardada %}<a href="{% url 'solicitudes:partida' form.guardada.pk %}#imagenes" title="Ver o quitar en la ficha">{{ form.guardada.n_imagenes }} de 3</a>{% endif %}
     {% if not correccion %}
-      <input type="file" class="form-control form-control-sm" name="{{ form.prefix }}-imagenes" multiple accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" title="JPG, PNG o WebP, hasta 10 MB; máximo 3 por partida">
+      <input type="file" name="{{ form.prefix }}-imagenes" multiple accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" title="JPG, PNG o WebP, hasta 10 MB; máximo 3 por partida">
     {% elif not form.guardada %}—{% endif %}
     {% if form.error_imagen %}<div class="text-danger small">{{ form.error_imagen }}</div>{% endif %}
   </td>

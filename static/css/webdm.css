@@ -25,16 +25,25 @@ body { background: #F5F6F8; color: #1F2328; }
 .wd-salir button:hover { background: #FFF1F0; }
 
 /* --- Tabla tipo Excel ---------------------------------------------------- */
-.wd-tabla-caja { overflow-x: auto; background: #fff; border: 1px solid #D8DCE1; border-radius: 8px; }
-.wd-tabla { border-collapse: collapse; font-size: 13px; min-width: 2300px; }
-.wd-tabla th { background: #F6F8FA; color: #424A53; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #D8DCE1; white-space: nowrap; text-align: left; }
-.wd-tabla td { padding: 4px 6px; border-bottom: 1px solid #EAEEF2; vertical-align: top; }
-.wd-tabla th.auto, .wd-tabla td.auto { background: #F6F8FA; color: #57606A; white-space: nowrap; }
-.wd-tabla input, .wd-tabla select { width: 100%; min-width: 90px; border: 1px solid transparent; border-radius: 4px; padding: 5px 6px; background: transparent; font: inherit; }
-.wd-tabla input:focus, .wd-tabla select:focus { border-color: #1D4ED8; outline: none; background: #fff; }
+/* Tabla de captura con aspecto de hoja de Excel (pedido de Dave, 28-nov-2026):
+   cuadrícula gris en todas las celdas, encabezados grises centrados, celdas sin cajas
+   ni esquinas redondeadas y el borde verde de Excel en la celda activa. */
+.wd-tabla-caja { overflow-x: auto; background: #fff; border: 1px solid #BFBFBF; }
+.wd-tabla { border-collapse: collapse; font-family: Calibri, "Segoe UI", Arial, sans-serif; font-size: 13px; min-width: 2300px; }
+.wd-tabla th { background: #F3F3F3; color: #333; font-weight: 400; padding: 3px 6px; border: 1px solid #D4D4D4; white-space: nowrap; text-align: center; }
+.wd-tabla td { padding: 0; border: 1px solid #D4D4D4; vertical-align: middle; height: 24px; }
+.wd-tabla th.auto { background: #E9E9E9; }
+.wd-tabla td.auto { background: #F2F2F2; color: #595959; white-space: nowrap; padding: 0 6px; }
+.wd-tabla input, .wd-tabla select { display: block; width: 100%; min-width: 90px; height: 24px; border: 0; border-radius: 0; padding: 0 5px; background: transparent; font: inherit; color: #000; }
+.wd-tabla select { -webkit-appearance: none; appearance: none; padding-right: 14px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23777'/%3E%3C/svg%3E") no-repeat right 4px center; }
+.wd-tabla input:focus, .wd-tabla select:focus { outline: 2px solid #217346; outline-offset: -2px; background-color: #fff; }
 .wd-tabla td.ancha input { min-width: 260px; }
 .wd-tabla td.con-error { background: #FFF1F0; box-shadow: inset 0 0 0 1px #CF222E; }
-.wd-tabla .error-celda { display: block; color: #A40E26; font-size: 12px; padding: 0 6px; }
+.wd-tabla .error-celda { display: block; color: #A40E26; font-size: 11px; padding: 0 5px 2px; }
+.wd-tabla input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.wd-tabla input[type=number] { -moz-appearance: textfield; }
+.wd-tabla input[type=file] { height: auto; font-size: 11px; padding: 2px 4px; }
 .wd-leyenda { display: flex; flex-wrap: wrap; gap: 24px; color: #57606A; font-size: 13px; }
 .wd-leyenda span::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px; border: 1px solid; }
 .wd-leyenda .l-auto::before { background: #F6F8FA; border-color: #D8DCE1; }
@@ -98,5 +107,5 @@ td.wd-error { background: #FFEBE9; }
 .wd-visor-cerrar { right: -14px; }
 .wd-visor-descargar { right: 32px; }
 .wd-lupa { display: none; position: absolute; width: 220px; height: 220px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 16px rgba(0,0,0,.45); background-repeat: no-repeat; pointer-events: none; }
-.wd-celda-imagenes input[type=file] { width: 190px; font-size: 12px; }
-.wd-celda-imagenes a { display: block; margin-bottom: 2px; }
+.wd-celda-imagenes input[type=file] { width: 190px; }
+.wd-celda-imagenes a { display: block; padding: 0 5px; }

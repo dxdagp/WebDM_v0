@@ -26,6 +26,7 @@
       <section class="wd-ficha">
         <h2 class="h6 fw-bold mb-3">Datos de la partida {% if form %}<small class="text-secondary fw-normal">(puedes corregirlos)</small>{% endif %}</h2>
         <div class="wd-campos">
+          {# Mismo orden que la tabla (definido por Dave): Tipo de Material después de Partida y CeBe después de Almacén. #}
           {% if form %}
             {% for campo in form.visible_fields %}
               <div class="wd-campo{% if campo.name == 'descripcion' or campo.name == 'compatibilidad' %} ancho{% endif %}">
@@ -33,14 +34,20 @@
                 {{ campo }}
                 {% for e in campo.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
               </div>
-              {% if campo.name == "centro" %}<div class="wd-campo"><span class="form-label">CeBe</span><div class="wd-valor auto">{{ cebe|default:"—" }}</div></div>{% endif %}
+              {% if campo.name == "numero" %}<div class="wd-campo"><span class="form-label">Tipo de Material</span><div class="wd-valor auto">{{ p.alta.tipo_material.codigo|default:"—" }}</div></div>{% endif %}
+              {% if campo.name == "almacen" %}<div class="wd-campo"><span class="form-label">CeBe</span><div class="wd-valor auto">{{ cebe|default:"—" }}</div></div>{% endif %}
             {% endfor %}
+            <div class="wd-campo ancho"><span class="form-label">Coincidencias mientras escribes</span><div id="wd-coincidencias" class="wd-coincidencias small" data-url="{% url 'solicitudes:coincidencias' %}" aria-live="polite">Al cambiar la descripción o el No. Parte verás aquí si ya existe en el Catálogo SAP.</div></div>
           {% else %}
             {% with a=p.alta %}
-            <div class="wd-campo"><span class="form-label">Partida</span><div class="wd-valor">{{ p.numero }}</div></div>
+            <div class="wd-campo"><span class="form-label">Partida</span><div class="wd-valor">{{ p.numero|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Tipo de Material</span><div class="wd-valor auto">{{ p.alta.tipo_material.codigo|default:"—" }}</div></div>
             <div class="wd-campo"><span class="form-label">Centro</span><div class="wd-valor">{{ p.centro.codigo|default:"—" }}</div></div>
-            <div class="wd-campo"><span class="form-label">CeBe</span><div class="wd-valor auto">{{ cebe|default:"—" }}</div></div>
             <div class="wd-campo ancho"><span class="form-label">Descripción técnica del material</span><div class="wd-valor">{{ a.descripcion|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Unidad de medida base</span><div class="wd-valor">{{ a.umb|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Grupo de compras</span><div class="wd-valor">{{ a.grupo_compras|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Grupo de artículos</span><div class="wd-valor">{{ a.grupo_articulos|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Categoría de valoración</span><div class="wd-valor">{{ a.categoria_valoracion|default:"—" }}</div></div>
             <div class="wd-campo"><span class="form-label">Ubicación de la refacción</span><div class="wd-valor">{{ a.ubicacion|default:"—" }}</div></div>
             <div class="wd-campo"><span class="form-label">No. Parte Original</span><div class="wd-valor">{{ a.no_parte_original|default:"—" }}</div></div>
             <div class="wd-campo"><span class="form-label">Tipo de Unidad</span><div class="wd-valor">{{ a.tipo_unidad|default:"—" }}</div></div>
@@ -48,15 +55,10 @@
             <div class="wd-campo"><span class="form-label">Versión de la Unidad</span><div class="wd-valor">{{ a.version|default:"—" }}</div></div>
             <div class="wd-campo"><span class="form-label">Año modelo</span><div class="wd-valor">{{ a.anio_modelo|default:"—" }}</div></div>
             <div class="wd-campo ancho"><span class="form-label">Compatibilidad entre unidades</span><div class="wd-valor">{{ a.compatibilidad|default:"—" }}</div></div>
-            <div class="wd-campo"><span class="form-label">Unidad de medida base</span><div class="wd-valor">{{ a.umb|default:"—" }}</div></div>
-            <div class="wd-campo"><span class="form-label">Grupo de artículos</span><div class="wd-valor">{{ a.grupo_articulos|default:"—" }}</div></div>
-            <div class="wd-campo"><span class="form-label">Categoría de valoración</span><div class="wd-valor">{{ a.categoria_valoracion|default:"—" }}</div></div>
-            <div class="wd-campo"><span class="form-label">Grupo de compras</span><div class="wd-valor">{{ a.grupo_compras|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Almacén</span><div class="wd-valor">{{ a.almacen|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">CeBe</span><div class="wd-valor auto">{{ cebe|default:"—" }}</div></div>
             {% endwith %}
           {% endif %}
-          {% if form %}<div class="wd-campo ancho"><span class="form-label">Coincidencias mientras escribes</span><div id="wd-coincidencias" class="wd-coincidencias small" data-url="{% url 'solicitudes:coincidencias' %}" aria-live="polite">Al cambiar la descripción o el No. Parte verás aquí si ya existe en el Catálogo SAP.</div></div>{% endif %}
-          <div class="wd-campo"><span class="form-label">Tipo de Material</span><div class="wd-valor auto">{{ p.alta.tipo_material.codigo|default:"—" }}</div></div>
-          <div class="wd-campo"><span class="form-label">Almacén</span><div class="wd-valor auto">{{ p.alta.almacen.codigo|default:"—" }}</div></div>
           <div class="wd-campo"><span class="form-label">Código SAP</span><div class="wd-valor auto">{{ p.alta.codigo_sap|default:"—" }}</div></div>
         </div>
       </section>

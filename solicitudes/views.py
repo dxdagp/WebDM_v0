@@ -35,11 +35,14 @@ def _datos_automaticos(centros):
     de Centro o de Categoría. El servidor vuelve a calcularlos al guardar: lo
     que muestra el navegador es solo una ayuda visual.
     """
-    almacenes = Almacen.objects.filter(centro__in=centros, predeterminado=True, activo=True)
+    # Almacén propuesto por Centro: el predeterminado o, si no hay, el primero por código.
+    almacenes = {}
+    for a in Almacen.objects.filter(centro__in=centros, activo=True).order_by("-predeterminado", "codigo"):
+        almacenes.setdefault(a.centro_id, a)
     grupos = GrupoCompras.objects.filter(centro__in=centros, predeterminado=True, activo=True)
     return {
         "cebe": {str(c.pk): c.centro_beneficio for c in centros},
-        "almacen": {str(a.centro_id): a.codigo for a in almacenes},
+        "almacenPredeterminado": {str(c): str(a.pk) for c, a in almacenes.items()},
         "grupoPredeterminado": {str(g.centro_id): str(g.pk) for g in grupos},
         "tipoMaterial": {
             str(c.pk): c.tipo_material.codigo for c in CategoriaValoracion.objects.select_related("tipo_material")
