@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% load vencimientos %}
 {% load static %}
 {% block titulo %}{{ solicitud.folio|default:"Borrador" }}/{{ p.numero }} · WebDM{% endblock %}
 {% block contenido %}
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
   <div>
     <div class="text-secondary small"><a href="{{ volver }}">← Volver</a></div>
-    <h1 class="h4 fw-bold mb-1">{{ solicitud.folio|default:"Borrador" }} · Partida {{ p.numero }} <span class="wd-estado align-middle">{{ p.get_estado_display }}</span></h1>
+    <h1 class="h4 fw-bold mb-1">{{ solicitud.folio|default:"Borrador" }} · Partida {{ p.numero }} <span class="wd-estado align-middle">{{ p.get_estado_display }}</span> {% aviso_vencimiento p %}</h1>
     <div class="text-secondary">{{ solicitud.get_flujo_display }} · solicitante {{ solicitud.solicitante }} · <a href="{% url 'solicitudes:detalle' solicitud.pk %}">ver la solicitud completa</a></div>
   </div>
   {# Flechas: partida anterior y siguiente de esta misma solicitud. #}

@@ -8,3 +8,5 @@ __pycache__/
 # Generados por Django
 staticfiles/
 media/
+# Bitácora del job de vencimientos
+logs/

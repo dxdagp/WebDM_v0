@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load vencimientos %}
 {% block titulo %}{{ solicitud }} · WebDM{% endblock %}
 {% block contenido %}
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
@@ -22,7 +23,7 @@
       <tr id="partida-{{ p.numero }}"><td>{{ p.numero }}</td><td>{{ a.codigo_sap|default:"—" }}</td><td>{{ a.material.descripcion|default:"—" }}</td>
           <td>{{ p.centro.codigo|default:"—" }}</td><td>{{ a.almacen_destino.codigo|default:"—" }}</td><td>{{ a.centro_origen.codigo|default:"—" }}</td>
           <td>{{ a.almacen_modelo.codigo|default:"—" }}</td><td>{{ a.planificador.codigo|default:"—" }}</td><td>{{ a.grupo_compras.codigo|default:"—" }}</td>
-          <td>{{ p.centro.centro_beneficio|default:"—" }}</td><td><span class="wd-estado">{{ p.estado }}</span></td></tr>
+          <td>{{ p.centro.centro_beneficio|default:"—" }}</td><td><span class="wd-estado">{{ p.estado }}</span> {% aviso_vencimiento p %}</td></tr>
     {% endwith %}{% endfor %}
     </tbody>
   </table>
@@ -34,7 +35,7 @@
     <tbody>
     {% for p in solicitud.partidas.all %}{% with s=p.servicio %}
       <tr id="partida-{{ p.numero }}"><td>{{ p.numero }}</td><td>{{ s.tipo_servicio.codigo|default:"—" }}</td><td>{{ s.descripcion|default:"—" }}</td><td>{{ s.umb.codigo|default:"—" }}</td>
-          <td>{{ s.grupo_articulos.codigo|default:"—" }}</td><td>{{ s.codigo_sap|default:"—" }}</td><td><span class="wd-estado">{{ p.estado }}</span></td></tr>
+          <td>{{ s.grupo_articulos.codigo|default:"—" }}</td><td>{{ s.codigo_sap|default:"—" }}</td><td><span class="wd-estado">{{ p.estado }}</span> {% aviso_vencimiento p %}</td></tr>
     {% endwith %}{% endfor %}
     </tbody>
   </table>
@@ -49,7 +50,7 @@
       <tr id="partida-{{ p.numero }}"><td>{{ p.numero }}</td><td>{{ m.codigo_sap|default:"—" }}</td><td>{{ m.material.descripcion|default:"—" }}</td>
           {% if solicitud.flujo == "MOD_ZRA" %}<td>{{ p.centro.codigo|default:"General" }}</td>{% endif %}
           <td>{{ m.get_campo_display|default:"—" }}</td><td>{{ m.valor_actual|default:"(vacío)" }}</td><td>{{ m.valor_nuevo|default:"—" }}</td>
-          <td><span class="wd-estado">{{ p.estado }}</span></td></tr>
+          <td><span class="wd-estado">{{ p.estado }}</span> {% aviso_vencimiento p %}</td></tr>
     {% endwith %}{% endfor %}
     </tbody>
   </table>
@@ -62,7 +63,7 @@
     {% for p in solicitud.partidas.all %}
       <tr><td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.numero }}</a></td><td>{{ p.centro|default:"—" }}</td><td>{{ p.alta.descripcion }}</td>
           <td>{{ p.alta.no_parte_original }}</td><td>{{ p.alta.codigo_sap|default:"—" }}</td>
-          <td><span class="wd-estado">{{ p.estado }}</span></td></tr>
+          <td><span class="wd-estado">{{ p.estado }}</span> {% aviso_vencimiento p %}</td></tr>
     {% endfor %}
     </tbody>
   </table>

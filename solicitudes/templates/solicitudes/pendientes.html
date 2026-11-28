@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load vencimientos %}
 {% load static %}
 {% block titulo %}Pendientes de mi atención · WebDM{% endblock %}
 {% block contenido %}
@@ -93,7 +94,7 @@
           <td>{{ p.alta.no_parte_original }}</td>
           {% endif %}
           <td>{{ p.solicitud.solicitante }}</td>
-          <td title="hace {{ p.actualizada|timesince }}">{{ p.actualizada|date:"d/m/y H:i" }}</td>
+          <td title="hace {{ p.actualizada|timesince }}">{{ p.actualizada|date:"d/m/y H:i" }} {% aviso_vencimiento p %}</td>
           {# Motivo propio de cada partida. Al escribir, el renglón se selecciona solo (bandeja.js). #}
           <td class="wd-libre">
             {% if p.ultimo_motivo %}<div class="small text-secondary mb-1" title="Motivo de la última devolución">Última devolución: {{ p.ultimo_motivo }}</div>{% endif %}

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load vencimientos %}
 {% block titulo %}Mis solicitudes · WebDM{% endblock %}
 {% block contenido %}
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
@@ -29,7 +30,7 @@
           {% else %}<a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.folio }}</a>{% endif %}
         </td>
         <td>{{ s.flujo }}</td>
-        <td><span class="wd-estado">{{ s.estado }}</span></td>
+        <td><span class="wd-estado">{{ s.estado }}</span> {% vencidas_de s %}</td>
         <td>{{ s.partidas.all|length }}</td>
         <td>{{ s.creada|date:"d/m/Y H:i" }}</td>
         <td>{{ s.enviada|date:"d/m/Y H:i"|default:"—" }}</td>

@@ -124,4 +124,4 @@ En total pasan 184 pruebas.
 
 ## 7. Lo que sigue
 
-Vencimientos de 15/30 días.
+Vencimientos de 15/30 días ([fase 4f](fase-4f.md)).
