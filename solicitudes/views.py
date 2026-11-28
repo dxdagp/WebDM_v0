@@ -221,6 +221,8 @@ def pendientes(request):
         "activa": activa,
         "partidas": partidas,
         "filtros": filtros,
+        "hay_ampl": activa == "dm" and bandejas.partidas_de(request.user, "dm").filter(solicitud__flujo=Flujo.AMPL_ZRA).exists(),
+        "hay_amat": activa == "dm" and bandejas.partidas_de(request.user, "dm").exclude(solicitud__flujo=Flujo.AMPL_ZRA).exists(),
     })
 
 
@@ -243,6 +245,7 @@ def accion_en_bloque(request):
             "aprobar": "aprobada(s) y enviada(s) a Datos Maestros", "devolver": "devuelta(s) al solicitante",
             "cancelar": "cancelada(s)", "reenviar": "reenviada(s)", "cancelar_propia": "cancelada(s)",
             "devolver_a_validacion": "devuelta(s) a validación",
+            "excluir": "excluida(s); ya no salen en el TXT",
         }
         messages.success(request, f"{n} partida(s) {textos[accion]}.")
         _avisar_si_nadie_las_ve(request, accion, ids)
@@ -271,6 +274,36 @@ def _volver_a_bandeja(request):
     """Regresa a la misma pestaña y con los mismos filtros desde los que se hizo la acción."""
     query = {k: request.POST[k] for k in ("tab", "folio", "centro", "texto") if request.POST.get(k)}
     return redirect(f"{reverse('solicitudes:pendientes')}?{urlencode(query)}")
+
+
+@login_required
+@require_POST
+def exportar_ampl(request):
+    """DM: un solo Amp_Mat.txt con TODAS las ampliaciones marcadas en la bandeja, de uno o varios folios.
+
+    Exportar no cambia estados (sección 10.4): se puede repetir las veces que haga falta.
+    """
+    try:
+        partidas = ampliacion.seleccion_dm(request.user, request.POST.getlist("partidas"))
+    except flujo.AccionNoPermitida as e:
+        messages.error(request, str(e))
+        return _volver_a_bandeja(request)
+    respuesta = HttpResponse(ampliacion.texto_txt(partidas), content_type="text/plain; charset=utf-8")
+    respuesta["Content-Disposition"] = f'attachment; filename="{ampliacion.NOMBRE_TXT}"'
+    return respuesta
+
+
+@login_required
+@require_POST
+def finalizar_ampl(request):
+    """DM: termina las ampliaciones marcadas y agrega su Centro nuevo al catálogo de materiales."""
+    try:
+        n = ampliacion.finalizar(request.user, ids=request.POST.getlist("partidas"))
+    except flujo.AccionNoPermitida as e:
+        messages.error(request, str(e))
+    else:
+        messages.success(request, f"{n} ampliación(es) terminada(s); su Centro nuevo ya está en el catálogo de materiales.")
+    return _volver_a_bandeja(request)
 
 
 @login_required

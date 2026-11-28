@@ -152,7 +152,7 @@ SELECT fecha, tipo, motivo FROM solicitudes_evento WHERE tipo = 'EXCLUSION' ORDE
 
 - Enter (Validar) revisa sin enviar, en AMAT y en AMPL.
 
-En total pasan 152 pruebas (incluye `test_volumen.py`: 1,200 partidas en AMAT y en AMPL, y 2,001 que deben marcar error).
+En total pasan 155 pruebas (incluye `test_volumen.py`: 1,200 partidas en AMAT y en AMPL, y 2,001 que deben marcar error).
 
 ## 8. Enter valida, no envía (AMAT y AMPL)
 
@@ -192,6 +192,35 @@ Y los formsets usan `max_num=absolute_max=MAX_PARTIDAS` con `validate_max=True`.
 
 Al abrir un borrador grande, la tabla se dibuja con unas 25 consultas, sin importar cuántas partidas tenga. Lo que sí crece por renglón son los `INSERT`: cada partida y su detalle se guardan.
 
-## 10. Lo que sigue
+## 10. DM atiende las ampliaciones desde su bandeja
+
+Pedido de Dave: exportar no es por partida ni por folio, sino **todo lo seleccionado**. Las ampliaciones ya traen su código, así que no se captura nada: solo se marcan.
+
+En **Pendientes → Datos Maestros**, cuando hay ampliaciones, aparecen tres botones que usan las casillas:
+
+| Botón | Qué hace |
+| --- | --- |
+| **Exportar Amp_Mat.txt** | Un solo archivo con todas las partidas marcadas, aunque sean de varios folios. No cambia nada y se puede repetir. |
+| **Excluir** | Pide el motivo de cada partida marcada (igual que Devolver). Ya no salen en el TXT. |
+| **Finalizar ampliaciones seleccionadas** | Las pasa a TERMINADA y agrega su Centro nuevo al catálogo de materiales. Cada folio queda TERMINADA cuando ya no le queda nada pendiente. |
+
+El botón de las altas AMAT cambió de nombre a **Terminar altas con el código capturado**, y solo sale si hay altas en la bandeja.
+
+Si entre lo marcado hay algo que no es una ampliación en Datos Maestros (por ejemplo, un alta AMAT), no se hace nada y el mensaje dice qué quitar: todas o ninguna.
+
+El código está en `ampliacion.seleccion_dm()` y en las vistas `exportar_ampl` y `finalizar_ampl`. La consulta que arma el TXT es una sola, para todos los folios:
+
+```sql
+SELECT ... FROM solicitudes_partida p
+JOIN solicitudes_solicitud s ON s.id = p.solicitud_id
+JOIN solicitudes_detalleampliacion a ON a.partida_id = p.id
+...
+WHERE s.flujo = 'AMPL_ZRA' AND p.estado = 'EN_DM'
+  AND p.centro_id IN (SELECT centro_id FROM ... centros del usuario)
+  AND p.id IN (41, 42, 57)
+ORDER BY s.folio, p.numero;
+```
+
+## 11. Lo que sigue
 
 Modificaciones (MOD_ZRA y MOD_ZSA), alta de servicios (ASER_ZSA) y vencimientos de 15/30 días.

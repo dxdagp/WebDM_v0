@@ -38,6 +38,7 @@
     // Cuenta los folios distintos (cada casilla trae su folio en data-folio).
     var folios = {};
     marcadas.forEach(function (c) { folios[c.dataset.folio] = true; });
+    if (boton.hasAttribute("data-exportar")) return; // exportar no cambia nada: sin confirmación
     var texto = "Vas a " + boton.getAttribute("data-verbo") + " " + marcadas.length + " partida(s) de " +
       Object.keys(folios).length + " folio(s). ¿Continuar?";
     if (!window.confirm(texto)) e.preventDefault();
