@@ -27,5 +27,6 @@ La explicación paso a paso, incluida la creación de la base de datos en Postgr
 | 3 | Flujos, bandejas de VAL_MAT y DM, Código SAP, sesiones ([guía](docs/fase-3.md)) | Hecha |
 | 4a | Imágenes y búsqueda de duplicados ([guía](docs/fase-4.md)) | Hecha |
 | 4b | Catálogos SAP de materiales y servicios, importación del TXT ([guía](docs/fase-4b.md)) | Hecha |
-| 4c | AMPL_ZRA y exportación TXT, modificaciones, servicios, vencimientos | Pendiente |
+| 4c | AMPL_ZRA: ampliación a Centro y exportación Amp_Mat.txt ([guía](docs/fase-4c.md)) | Hecha |
+| 4d | Modificaciones, alta de servicios, vencimientos | Pendiente |
 | 5 | Despliegue en Ubuntu (Nginx, Gunicorn, systemd) | Pendiente |

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}{% if correccion %}Corregir {{ solicitud }}{% elif solicitud %}Borrador AMPL_ZRA{% else %}Nueva solicitud AMPL_ZRA{% endif %} · WebDM{% endblock %}
+{% block contenido %}
+<form method="post" id="form-captura" novalidate{% if solicitud and not correccion %} action="{% url 'solicitudes:editar_ampl' solicitud.pk %}"{% endif %}>
+  {% csrf_token %}
+  {# Enter en una celda "presiona" el PRIMER botón de envío del formulario. Este botón invisible va #}
+  {# primero para que Enter valide (pedido de Dave) en vez de enviar, guardar o eliminar. #}
+  <button type="submit" name="accion" value="validar" class="wd-enter" tabindex="-1" aria-hidden="true">Validar</button>
+  {{ formset.management_form }}
+
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+      {% if correccion %}
+        <div class="text-secondary small"><a href="{% url 'solicitudes:detalle' solicitud.pk %}">{{ solicitud }}</a> / Corregir</div>
+        <h1 class="h4 fw-bold mb-1">Corregir {{ solicitud }}</h1>
+        <div class="text-secondary">Solo aparecen las partidas que puedes corregir ahora. Cada cambio queda en la historia de la partida.</div>
+      {% else %}
+        <div class="text-secondary small">Materiales / Ampliar a Centro (AMPL_ZRA)</div>
+        <h1 class="h4 fw-bold mb-1">{% if solicitud %}Borrador AMPL_ZRA{% else %}Nueva solicitud AMPL_ZRA{% endif %} <span class="wd-estado align-middle">BORRADOR</span></h1>
+        <div class="text-secondary">Folio: se asigna al enviar (formato AMPL_ZRA-2026-000001)</div>
+      {% endif %}
+    </div>
+    <div class="d-flex gap-2">
+      {% if correccion %}
+        <button type="submit" name="accion" value="guardar" class="btn btn-outline-secondary">Guardar correcciones</button>
+        {% if puede_reenviar %}<button type="submit" name="accion" value="reenviar" class="btn btn-primary fw-semibold">Guardar y reenviar</button>{% endif %}
+      {% else %}
+        {% if solicitud %}<button type="submit" name="accion" value="eliminar" class="btn btn-outline-danger" formnovalidate onclick="return confirm('¿Eliminar este borrador con todas sus partidas? No se puede deshacer.');">Eliminar borrador</button>{% endif %}
+        <button type="submit" name="accion" value="guardar" class="btn btn-outline-secondary">Guardar borrador</button>
+        <button type="submit" name="accion" value="enviar" class="btn btn-primary fw-semibold">Enviar</button>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if sin_centros %}<div class="alert alert-warning">No tienes Centros autorizados. Pide a ADMIN que te asigne al menos uno.</div>{% endif %}
+  {% for e in formset.non_form_errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+    <span class="text-secondary">Escribe o pega el Material y el Centro nuevo: WebDM propone el Centro modelo (donde ya existe), los almacenes, el planificador y el grupo de compras. Puedes pegar bloques desde Excel.</span>
+    {% if not correccion %}<button type="button" class="btn btn-sm btn-outline-secondary" id="agregar">+ Agregar partida</button>{% endif %}
+  </div>
+
+  <div class="wd-tabla-caja">
+    <table class="wd-tabla wd-tabla-ampl">
+      <thead>
+        <tr>
+          <th class="auto">Partida</th><th class="auto">Descripción</th><th>Material</th><th>Centro nuevo</th>
+          <th>Almacén nuevo</th><th>Centro modelo</th><th>Almacén modelo</th><th>Planificador</th>
+          <th>Grupo de compras</th><th class="auto">CeBe</th><th class="auto">Estado</th>{% if not correccion %}<th class="auto">Acción</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody id="filas">
+        {% for form in formset %}{% include "solicitudes/_fila_ampl.html" %}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="wd-leyenda mt-2">
+    <span class="l-auto">Automático: no se captura</span>
+    <span class="l-error">Error: corrígelo para guardar o enviar</span>
+  </div>
+</form>
+{% if not correccion %}<template id="fila-vacia">{% with form=formset.empty_form %}{% include "solicitudes/_fila_ampl.html" %}{% endwith %}</template>{% endif %}
+{{ datos_automaticos|json_script:"datos-automaticos" }}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/ampliacion.js' %}"></script>{% endblock %}

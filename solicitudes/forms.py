@@ -12,10 +12,12 @@ Dos niveles de validación (Revisión 3, sección 6):
 """
 
 from django import forms
+from django.conf import settings
 
 from catalogos.models import Almacen, CategoriaValoracion, Centro, GrupoArticulos, GrupoCompras, UbicacionRefaccion, UMB
 
 from .normalizar import texto_sap
+from .rapido import FormsetCompartido, compartir_catalogos
 
 
 class CampoTextoSAP(forms.CharField):
@@ -69,10 +71,13 @@ class PartidaAltaForm(forms.Form):
     # el almacén predeterminado del Centro.
     almacen = Catalogo(Almacen.objects.select_related("centro"), label="Almacén")
 
-    def __init__(self, *args, centros=None, **kwargs):
+    def __init__(self, *args, centros=None, compartido=None, **kwargs):
         super().__init__(*args, **kwargs)
         # Un usuario solo puede capturar en sus Centros autorizados (Revisión 3, sección 5).
         self.fields["centro"].queryset = centros if centros is not None else Centro.objects.none()
+        self.compartido = compartido
+        if compartido is not None:  # en una tabla: los catálogos se consultan una vez para todos los renglones
+            compartir_catalogos(self, compartido)
 
     @property
     def vacio(self):
@@ -91,16 +96,31 @@ class PartidaAltaForm(forms.Form):
         if centro and almacen and almacen.centro_id != centro.id:
             # La relación Centro–Almacén: el almacén tiene que ser de ESE Centro.
             self.add_error("almacen", "Este almacén no pertenece al Centro de la partida.")
-        if centro and not almacen and not Almacen.objects.filter(centro=centro, activo=True).exists():
+        if centro and not almacen and not self._centro_tiene_almacen(centro):
             self.add_error("almacen", "Este Centro no tiene almacenes activos; avisa a ADMIN.")
         return datos
+
+    def _centro_tiene_almacen(self, centro):
+        if self.compartido is not None and "almacen" in self.compartido:
+            return any(a.centro_id == centro.id for a in self.compartido["almacen"][0].values())
+        return Almacen.objects.filter(centro=centro, activo=True).exists()
 
     def faltantes(self):
         """Campos obligatorios vacíos. Solo se usa al Enviar."""
         return [c for c in CAMPOS_OBLIGATORIOS_ENVIO if self.cleaned_data.get(c) in (None, "")]
 
 
-class BasePartidasFormSet(forms.BaseFormSet):
+# Máximo de partidas por solicitud (config/settings.py). validate_max: si llegan más, el formset
+# marca un error en vez de cortar los renglones sobrantes en silencio.
+LIMITE = {"max_num": settings.MAX_PARTIDAS, "absolute_max": settings.MAX_PARTIDAS, "validate_max": True}
+
+
+class BasePartidasFormSet(FormsetCompartido, forms.BaseFormSet):
+    default_error_messages = {
+        **forms.BaseFormSet.default_error_messages,
+        "too_many_forms": "Máximo %(num)d partidas por solicitud. Divide la captura en varias solicitudes.",
+    }
+
     def __init__(self, *args, centros=None, **kwargs):
         self.centros = centros
         super().__init__(*args, **kwargs)
@@ -140,7 +160,7 @@ class BasePartidasFormSet(forms.BaseFormSet):
         return ok
 
 
-PartidasFormSet = forms.formset_factory(PartidaAltaForm, formset=BasePartidasFormSet, extra=0, can_delete=False)
+PartidasFormSet = forms.formset_factory(PartidaAltaForm, formset=BasePartidasFormSet, extra=0, can_delete=False, **LIMITE)
 
 
 # --- Corrección de partidas ya enviadas (fase 3) ------------------------------------------
@@ -167,5 +187,5 @@ class BaseCorreccionFormSet(BasePartidasFormSet):
 
 
 CorreccionFormSet = forms.formset_factory(
-    PartidaCorreccionForm, formset=BaseCorreccionFormSet, extra=0, can_delete=False
+    PartidaCorreccionForm, formset=BaseCorreccionFormSet, extra=0, can_delete=False, **LIMITE
 )

@@ -161,3 +161,23 @@ class DescargaTests(TestCase):
         self.client.force_login(sol)
         r = self.client.get(reverse("solicitudes:ver_imagen", args=[imagen.pk]), {"descargar": 1})
         self.assertIn('attachment; filename="AMAT_ZRA-2026-000001-partida-10-imagen-1.webp"', r["Content-Disposition"])
+
+
+class ValidarAmatTests(TestCase):
+    def test_validar_guarda_borrador_y_no_envia(self):
+        from solicitudes.models import Solicitud
+
+        c = crear_catalogos()
+        sol = crear_usuario("sol", "SOL_MAT", centros=[c["mttu"]])
+        self.client.force_login(sol)
+        datos = {"form-TOTAL_FORMS": "1", "form-INITIAL_FORMS": "0", "accion": "validar",
+                 "form-0-numero": "10", "form-0-centro": c["mttu"].pk, "form-0-descripcion": "FILTRO"}
+        r = self.client.post(reverse("solicitudes:nueva_amat"), datos, follow=True)
+        self.assertContains(r, "hay celdas por corregir antes de enviar")
+        s = Solicitud.objects.get()
+        self.assertEqual((s.estado, s.folio), ("BORRADOR", None))
+        # Sin partidas, validar no crea nada.
+        datos.update({"form-0-numero": "", "form-0-centro": "", "form-0-descripcion": ""})
+        r = self.client.post(reverse("solicitudes:nueva_amat"), datos, follow=True)
+        self.assertContains(r, "Agrega al menos una partida")
+        self.assertEqual(Solicitud.objects.count(), 1)

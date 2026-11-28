@@ -1,0 +1,16 @@
+{# Un renglón de la tabla AMPL_ZRA (captura y corrección). Orden de Dave: Descripción (automática, a la izquierda), Material, Centro nuevo, #}
+{# Almacén nuevo, Centro modelo, Almacén modelo; luego Planificador y Grupo de compras (propuestos) y CeBe. #}
+<tr class="wd-fila">
+  {% include "solicitudes/_celda.html" with campo=form.numero clase="auto" %}
+  <td class="auto" data-auto="descripcion">—</td>
+  {% include "solicitudes/_celda.html" with campo=form.codigo_sap %}
+  {% include "solicitudes/_celda.html" with campo=form.centro %}
+  {% include "solicitudes/_celda.html" with campo=form.almacen_destino %}
+  {% include "solicitudes/_celda.html" with campo=form.centro_origen %}
+  {% include "solicitudes/_celda.html" with campo=form.almacen_modelo %}
+  {% include "solicitudes/_celda.html" with campo=form.planificador %}
+  {% include "solicitudes/_celda.html" with campo=form.grupo_compras %}
+  <td class="auto" data-auto="cebe">—</td>
+  <td class="auto">{% if form.pid %}{{ form.pid }}{% endif %}<span class="wd-estado">{{ form.estado_partida|default:"BORRADOR" }}</span></td>
+  {% if not correccion %}<td class="auto"><button type="button" class="btn btn-link btn-sm p-0" data-quitar>Quitar</button></td>{% endif %}
+</tr>

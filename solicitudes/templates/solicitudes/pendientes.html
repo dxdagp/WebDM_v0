@@ -40,8 +40,16 @@
       <button name="accion" value="reenviar" class="btn btn-primary btn-sm" data-verbo="reenviar">Reenviar sin cambios</button>
       <button name="accion" value="cancelar_propia" class="btn btn-outline-danger btn-sm" data-verbo="cancelar" data-motivo>Cancelar</button>
     {% elif activa == "dm" %}
-      <button formaction="{% url 'solicitudes:terminar_dm' %}" class="btn btn-primary btn-sm" data-codigos>Terminar partidas con código</button>
+      {# Altas AMAT: DM escribe el Código SAP que le dio SAP en cada renglón. Las ampliaciones ya traen código. #}
+      {% if hay_amat %}<button formaction="{% url 'solicitudes:terminar_dm' %}" class="btn btn-primary btn-sm" data-codigos>Terminar altas con el código capturado</button>{% endif %}
       <button name="accion" value="devolver_a_validacion" class="btn btn-outline-secondary btn-sm" data-verbo="devolver a validación" data-motivo>Devolver a VAL_MAT</button>
+      {% if hay_ampl %}
+        {# Ampliaciones: un solo Amp_Mat.txt con todo lo marcado, de uno o varios folios. #}
+        <span class="vr mx-1"></span>
+        <button formaction="{% url 'solicitudes:exportar_ampl' %}" class="btn btn-outline-primary btn-sm" data-exportar>Exportar Amp_Mat.txt</button>
+        <button name="accion" value="excluir" class="btn btn-outline-danger btn-sm" data-verbo="excluir" data-motivo>Excluir</button>
+        <button formaction="{% url 'solicitudes:finalizar_ampl' %}" class="btn btn-outline-success btn-sm" data-verbo="finalizar">Finalizar ampliaciones seleccionadas</button>
+      {% endif %}
     {% endif %}
     <span class="text-secondary small">Para devolver o cancelar, escribe el motivo de cada partida en su renglón.</span>
   </div>
@@ -64,17 +72,25 @@
           <td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.solicitud.folio }}</a></td>
           <td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.numero }}</a></td>
           <td>{{ p.centro.codigo|default:"—" }}</td>
+          {% if p.solicitud.flujo == "AMPL_ZRA" %}
+            {# Ampliación: material que ya existe, hacia un Centro nuevo. #}
+            <td><a class="text-reset" href="{% url 'solicitudes:partida' p.pk %}">Ampliar {{ p.ampliacion.codigo_sap }} · {{ p.ampliacion.material.descripcion }}</a></td>
+            <td>—</td><td>—</td><td>desde {{ p.ampliacion.centro_origen.codigo|default:"—" }}</td>
+          {% else %}
           <td><a class="text-reset" href="{% url 'solicitudes:partida' p.pk %}">{{ p.alta.descripcion }}</a></td>
           <td>{{ p.alta.umb.codigo|default:"—" }}</td>
           <td>{{ p.alta.grupo_articulos.codigo|default:"—" }}</td>
           <td>{{ p.alta.no_parte_original }}</td>
+          {% endif %}
           <td>{{ p.solicitud.solicitante }}</td>
           <td title="hace {{ p.actualizada|timesince }}">{{ p.actualizada|date:"d/m/y H:i" }}</td>
           {# Motivo propio de cada partida. Al escribir, el renglón se selecciona solo (bandeja.js). #}
           <td class="wd-libre">
             {% if p.ultimo_motivo %}<div class="small text-secondary mb-1" title="Motivo de la última devolución">Última devolución: {{ p.ultimo_motivo }}</div>{% endif %}
             <textarea class="form-control form-control-sm wd-motivo" name="motivo-{{ p.pk }}" rows="1" aria-label="Motivo de {{ p.solicitud.folio }}/{{ p.numero }}">{{ p.motivo_capturado|default:'' }}</textarea></td>
-          {% if activa == "dm" %}
+          {% if activa == "dm" and p.solicitud.flujo == "AMPL_ZRA" %}
+            <td class="text-secondary small">Ampliación</td>
+          {% elif activa == "dm" %}
             <td class="{% if p.error_codigo %}con-error{% endif %}">
               <input class="form-control form-control-sm wd-codigo" name="codigo-{{ p.pk }}" inputmode="numeric" maxlength="6"
                      value="{{ p.codigo_capturado|default:'' }}" aria-label="Código SAP">
@@ -88,7 +104,8 @@
       </tbody>
     </table>
   </div>
-  {% if activa == "dm" %}<p class="text-secondary small mt-2">Puedes pegar una columna de códigos desde Excel en la primera celda de Código SAP: se llenan hacia abajo. Solo se terminan las partidas que tienen código.</p>{% endif %}
+  {% if activa == "dm" and hay_ampl %}<p class="text-secondary small mt-2">Ampliaciones: marca las partidas y usa <b>Exportar Amp_Mat.txt</b> (un solo archivo con todo lo marcado, aunque sean de varios folios). Exportar no cambia nada; cuando SAP ya las tenga, márcalas otra vez y <b>Finalizar ampliaciones seleccionadas</b>.</p>{% endif %}
+  {% if activa == "dm" and hay_amat %}<p class="text-secondary small mt-2">Puedes pegar una columna de códigos desde Excel en la primera celda de Código SAP: se llenan hacia abajo. Solo se terminan las partidas que tienen código.</p>{% endif %}
   <p class="text-secondary small mt-2">Haz clic en el folio de una partida para ver su ficha completa, corregirla o actuar solo sobre ella.</p>
 </form>
 {% endblock %}

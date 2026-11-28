@@ -35,7 +35,7 @@ Recorrido sugerido, con tres navegadores o ventanas privadas (una por usuario, c
 2. `validador` abre **Pendientes de mi atención** (el número junto al menú dice cuántas tiene). Escribe el motivo en el renglón de una partida (se marca sola) y **Devolver al solicitante**. Marca la otra y **Aprobar**.
 3. `solicitante` ve la devuelta en **Por corregir**, abre el folio, **Corregir partidas**, cambia la marca y **Guardar y reenviar**.
 4. `validador` la aprueba.
-5. `dm` pega dos códigos de 6 dígitos (de Excel, en la primera celda de Código SAP) y **Terminar partidas con código**.
+5. `dm` pega dos códigos de 6 dígitos (de Excel, en la primera celda de Código SAP) y **Terminar altas con el código capturado** (antes se llamaba "Terminar partidas con código").
 6. Abre el folio: la cabecera dice TERMINADA y abajo está la **Historia** completa.
 
 > `validador` también tiene SOL_MAT. Si él envía o reenvía, sus partidas saltan la validación y van directo a DM (Revisión 3, sección 4).

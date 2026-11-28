@@ -7,8 +7,27 @@
     <h1 class="h4 fw-bold mb-1">{{ solicitud }} <span class="wd-estado align-middle">{{ solicitud.estado }}</span></h1>
     <div class="text-secondary">{{ solicitud.get_flujo_display }} · {{ solicitud.solicitante }} · enviada {{ solicitud.enviada|date:"d/m/Y H:i"|default:"—" }}</div>
   </div>
-  {% if puede_corregir %}<a class="btn btn-primary" href="{% url 'solicitudes:corregir' solicitud.pk %}">Corregir partidas</a>{% endif %}
+  <div class="d-flex gap-2">
+    {% if atiende_dm %}<a class="btn btn-primary" href="{% url 'solicitudes:ampliacion_dm' solicitud.pk %}">Datos Maestros: exportar / finalizar</a>{% endif %}
+    {% if puede_corregir %}<a class="btn btn-primary" href="{% url 'solicitudes:corregir' solicitud.pk %}">Corregir partidas</a>{% endif %}
+  </div>
 </div>
+{% if solicitud.flujo == "AMPL_ZRA" %}
+<div class="wd-tabla-caja mb-4">
+  <table class="wd-tabla wd-catalogo">
+    <thead><tr><th>Partida</th><th>Material</th><th>Descripción</th><th>Centro nuevo</th><th>Almacén nuevo</th><th>Centro modelo</th>
+               <th>Almacén modelo</th><th>Planificador</th><th>Grupo de compras</th><th>CeBe</th><th>Estado</th></tr></thead>
+    <tbody>
+    {% for p in solicitud.partidas.all %}{% with a=p.ampliacion %}
+      <tr id="partida-{{ p.numero }}"><td>{{ p.numero }}</td><td>{{ a.codigo_sap|default:"—" }}</td><td>{{ a.material.descripcion|default:"—" }}</td>
+          <td>{{ p.centro.codigo|default:"—" }}</td><td>{{ a.almacen_destino.codigo|default:"—" }}</td><td>{{ a.centro_origen.codigo|default:"—" }}</td>
+          <td>{{ a.almacen_modelo.codigo|default:"—" }}</td><td>{{ a.planificador.codigo|default:"—" }}</td><td>{{ a.grupo_compras.codigo|default:"—" }}</td>
+          <td>{{ p.centro.centro_beneficio|default:"—" }}</td><td><span class="wd-estado">{{ p.estado }}</span></td></tr>
+    {% endwith %}{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
 <div class="wd-tabla-caja mb-4">
   <table class="table mb-0 align-middle">
     <thead><tr><th>Partida</th><th>Centro</th><th>Descripción técnica</th><th>No. Parte Original</th><th>Código SAP</th><th>Estado</th></tr></thead>
@@ -21,6 +40,7 @@
     </tbody>
   </table>
 </div>
+{% endif %}
 
 {% if corregibles_codigo %}
 <h2 class="h6 fw-bold">Corregir Código SAP (DM)</h2>

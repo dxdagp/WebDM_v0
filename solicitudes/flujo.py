@@ -56,7 +56,10 @@ TRANSICIONES = {
     ),
     # DM solo puede devolver a VAL_MAT (Revisión 3, sección 7) y no cancela AMAT.
     "devolver_a_validacion": Transicion("DM", E.EN_DM, E.EN_VALIDACION, Evento.Tipo.DEVOLUCION, pide_motivo=True),
+    # Solo AMPL_ZRA (sección 10.4): DM retira una partida con motivo, por ejemplo si SAP la rechazó.
+    "excluir": Transicion("DM", E.EN_DM, E.EXCLUIDA, Evento.Tipo.EXCLUSION, pide_motivo=True),
 }
+SOLO_AMPLIACION = {"excluir"}
 
 
 def roles_de(usuario):
@@ -67,7 +70,11 @@ def roles_de(usuario):
 
 
 def faltantes(partida):
-    """Campos obligatorios vacíos de una partida AMAT ya guardada (mismas reglas que Enviar)."""
+    """Campos obligatorios vacíos de una partida ya guardada (mismas reglas que Enviar)."""
+    if partida.solicitud.flujo == "AMPL_ZRA":
+        from .ampliacion import faltantes as faltantes_ampl
+
+        return faltantes_ampl(partida)
     alta = partida.alta
     vacios = []
     for campo in CAMPOS_OBLIGATORIOS_ENVIO:
@@ -88,6 +95,8 @@ def faltantes(partida):
 
 def duplicado_de(partida):
     """El material del Catálogo SAP que duplica EXACTO a esta partida (sección 8), o None."""
+    if partida.solicitud.flujo != "AMAT_ZRA":
+        return None  # solo las altas buscan duplicados
     alta = partida.alta
     return duplicados.bloqueante(alta.descripcion, alta.no_parte_original)
 
@@ -159,6 +168,8 @@ def aplicar(usuario, accion, ids, motivo=""):
     if len(partidas) != len(ids):
         raise AccionNoPermitida("Alguna partida ya no existe. Recarga la página.")
     _verificar_alcance(usuario, partidas, t)
+    if accion in SOLO_AMPLIACION and any(p.solicitud.flujo != "AMPL_ZRA" for p in partidas):
+        raise AccionNoPermitida("Solo las partidas de ampliación (AMPL_ZRA) se pueden excluir.")
 
     movidas = [p for p in partidas if p.estado != t.desde]
     if movidas:
