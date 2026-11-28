@@ -255,6 +255,10 @@ def terminar_con_codigos(usuario, codigos):
         error = _error_codigo(codigo)
         if not error and codigo in vistos:
             error = "Código repetido en esta captura."
+        # Fase 4: tampoco se termina una partida sin imágenes (p. ej. una que llegó a DM antes
+        # de esta fase). DM la devuelve a VAL_MAT para que le suban al menos una.
+        if not error and p.solicitud.flujo == "AMAT_ZRA" and not p.imagenes.exists():
+            error = "La partida no tiene imágenes. Devuélvela a VAL_MAT."
         vistos.setdefault(codigo, p.pk)
         if error:
             errores[p.pk] = error

@@ -117,3 +117,23 @@ class PermisosYPantallaTests(TestCase):
             imagen.delete()
         with self.assertRaisesMessage(flujo.AccionNoPermitida, "al menos 1 imagen"):
             flujo.aplicar(self.val, "aprobar", [self.p.pk])
+
+    def test_dm_no_termina_sin_imagen(self):
+        # Una partida que llegó a DM antes de la fase 4, sin imágenes.
+        self.p.imagenes.all().delete()
+        self.p.estado = E.EN_DM
+        self.p.save()
+        with self.assertRaises(flujo.ErroresCodigo) as e:
+            flujo.terminar_con_codigos(self.dm, {self.p.pk: "555555"})
+        self.assertIn("no tiene imágenes", e.exception.errores[self.p.pk])
+        self.p.refresh_from_db()
+        self.assertEqual(self.p.estado, E.EN_DM)
+
+    def test_bandeja_no_aprueba_sin_imagen(self):
+        """Aprobar desde la bandeja tampoco deja pasar una partida sin imágenes."""
+        self.p.imagenes.all().delete()
+        self.client.force_login(self.val)
+        r = self.client.post(reverse("solicitudes:accion"), {"accion": "aprobar", "partidas": [self.p.pk]}, follow=True)
+        self.assertContains(r, "al menos 1 imagen")
+        self.p.refresh_from_db()
+        self.assertEqual(self.p.estado, E.EN_VALIDACION)
