@@ -9,6 +9,10 @@ urlpatterns = [
     path("", views.mis_solicitudes, name="mis_solicitudes"),
     path("amat/nueva/", views.capturar_amat, name="nueva_amat"),
     path("amat/<int:pk>/", views.capturar_amat, name="editar_amat"),
+    path("ampl/nueva/", views.capturar_ampl, name="nueva_ampl"),
+    path("ampl/<int:pk>/", views.capturar_ampl, name="editar_ampl"),
+    path("ampl/material/", views.material_ampl, name="material_ampl"),
+    path("<int:pk>/ampliacion-dm/", views.ampliacion_dm, name="ampliacion_dm"),
     path("<int:pk>/", views.detalle, name="detalle"),
     # Fase 3
     path("<int:pk>/corregir/", views.corregir, name="corregir"),

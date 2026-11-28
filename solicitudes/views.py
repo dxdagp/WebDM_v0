@@ -4,18 +4,18 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.forms import Select
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
 from catalogo_sap.models import MaterialSAP
-from catalogos.models import Almacen, CategoriaValoracion, GrupoCompras
+from catalogos.models import Almacen, CategoriaValoracion, Centro, GrupoCompras, Planificador
 
-from . import bandejas, duplicados, flujo, imagenes, servicios
+from . import ampliacion, bandejas, duplicados, flujo, imagenes, servicios
 from .forms import CorreccionFormSet, PartidaCorreccionForm, PartidasFormSet
 from .models import Flujo, ImagenPartida, Partida, Solicitud
 
@@ -152,7 +152,11 @@ def puede_ver(usuario, solicitud):
 def detalle(request, pk):
     """Vista de solo lectura de una solicitud, con la historia de cada partida."""
     solicitud = get_object_or_404(
-        Solicitud.objects.select_related("solicitante").prefetch_related("partidas__alta", "partidas__centro"), pk=pk
+        Solicitud.objects.select_related("solicitante").prefetch_related(
+            "partidas__alta", "partidas__centro", "partidas__ampliacion__material", "partidas__ampliacion__centro_origen",
+            "partidas__ampliacion__almacen_destino", "partidas__ampliacion__almacen_modelo",
+            "partidas__ampliacion__planificador", "partidas__ampliacion__grupo_compras",
+        ), pk=pk
     )
     if not puede_ver(request.user, solicitud):
         raise PermissionDenied("Esta solicitud no es tuya ni de tus Centros.")
@@ -162,6 +166,9 @@ def detalle(request, pk):
         "solicitud": solicitud,
         "eventos": solicitud.eventos.select_related("usuario", "partida").order_by("fecha"),
         "puede_corregir": servicios.partidas_editables(request.user, solicitud).exists(),
+        # AMPL_ZRA: DM con partidas EN_DM de sus Centros ve el botón para exportar, excluir y finalizar.
+        "atiende_dm": solicitud.flujo == Flujo.AMPL_ZRA and "DM" in roles
+        and ampliacion.partidas_dm(request.user, solicitud).exists(),
         # DM puede corregir el código de las TERMINADA de sus Centros (sección 9).
         "corregibles_codigo": [
             p for p in solicitud.partidas.all()
@@ -189,7 +196,10 @@ def pendientes(request):
     if filtros["centro"]:
         partidas = partidas.filter(centro__codigo__iexact=filtros["centro"])
     if filtros["texto"]:
-        partidas = partidas.filter(alta__descripcion__icontains=filtros["texto"])
+        t = filtros["texto"]
+        # AMPL no tiene descripción propia: se busca en la del material y en su código.
+        partidas = partidas.filter(Q(alta__descripcion__icontains=t) | Q(ampliacion__material__descripcion__icontains=t)
+                                   | Q(ampliacion__codigo_sap__startswith=t))
 
     # Motivos escritos antes de un error (ver accion_en_bloque): se muestran de nuevo una sola vez.
     capturados = request.session.pop("motivos_bandeja", {})
@@ -301,11 +311,13 @@ def corregir_codigo(request, pk):
 @login_required
 def corregir(request, pk):
     """Tabla tipo Excel con solo las partidas que el usuario puede corregir ahora."""
-    solicitud = get_object_or_404(Solicitud, pk=pk, flujo=Flujo.AMAT_ZRA)
-    editables = list(servicios.partidas_editables(request.user, solicitud).select_related("alta"))
+    solicitud = get_object_or_404(Solicitud, pk=pk, flujo__in=[Flujo.AMAT_ZRA, Flujo.AMPL_ZRA])
+    editables = list(servicios.partidas_editables(request.user, solicitud).select_related("alta", "ampliacion"))
     if not editables:
         messages.error(request, "No tienes partidas de esta solicitud para corregir.")
         return redirect("solicitudes:detalle", pk=solicitud.pk)
+    if solicitud.flujo == Flujo.AMPL_ZRA:
+        return _corregir_ampl(request, solicitud, editables)
 
     # El Centro se puede cambiar solo por uno de los Centros autorizados del usuario.
     centros = request.user.centros.filter(activo=True)
@@ -423,8 +435,8 @@ def _acciones_posibles(usuario, partida):
     en_mis_centros = usuario.centros.filter(pk=partida.centro_id).exists()
     acciones = []
     for clave, t in flujo.TRANSICIONES.items():
-        if t.desde != partida.estado or t.rol not in roles:
-            continue
+        if t.desde != partida.estado or t.rol not in roles or clave in flujo.SOLO_AMPLIACION:
+            continue  # excluir es solo de AMPL, que se atiende en su propia pantalla de DM
         alcance = partida.solicitud.solicitante_id == usuario.pk if t.solo_propias else en_mis_centros
         if alcance:
             etiqueta, clase = ETIQUETAS_ACCION[clave]
@@ -444,6 +456,9 @@ def partida(request, pk):
     solicitud = p.solicitud
     if not puede_ver(request.user, solicitud):
         raise PermissionDenied("Esta partida no es tuya ni de tus Centros.")
+    if solicitud.flujo == Flujo.AMPL_ZRA:
+        # AMPL no tiene ficha por partida: sus datos caben en un renglón del detalle.
+        return redirect(f"{reverse('solicitudes:detalle', args=[solicitud.pk])}#partida-{p.numero}")
 
     editable = servicios.partidas_editables(request.user, solicitud).filter(pk=p.pk).exists()
     centros = request.user.centros.filter(activo=True)
@@ -614,3 +629,165 @@ def coincidencias(request):
     """
     resultados = duplicados.buscar(request.GET.get("descripcion", ""), request.GET.get("no_parte", ""))
     return JsonResponse({"coincidencias": [c.como_dict() for c in resultados]})
+
+
+# --- Fase 4c: AMPL_ZRA, ampliación de material a Centro (Revisión 3, sección 10) --------------
+
+
+def _datos_ampliacion(centros):
+    """Lo que el JavaScript necesita para proponer valores: por Centro, su CeBe y sus predeterminados."""
+    def primeros(modelo):
+        elegidos = {}
+        for x in modelo.objects.filter(activo=True).order_by("-predeterminado", "codigo"):
+            elegidos.setdefault(str(x.centro_id), str(x.pk))
+        return elegidos
+
+    return {
+        "cebe": {str(c.pk): c.centro_beneficio for c in Centro.objects.filter(activo=True)},
+        "almacen": primeros(Almacen),
+        "grupo": primeros(GrupoCompras),
+        "planificador": primeros(Planificador),
+        "urlMaterial": reverse("solicitudes:material_ampl"),
+    }
+
+
+@login_required
+def material_ampl(request):
+    """JSON para la captura AMPL: descripción del material y los Centros donde ya existe."""
+    material = ampliacion.material_de(request.GET.get("codigo", "").strip())
+    if material is None:
+        return JsonResponse({"existe": False})
+    centros = ampliacion.centros_del_material(material)
+    return JsonResponse({
+        "existe": True, "descripcion": material.descripcion,
+        "centros": [{"id": c.pk, "codigo": c.codigo} for c in centros],
+    })
+
+
+@login_required
+def capturar_ampl(request, pk=None):
+    """Nueva solicitud AMPL_ZRA o edición de un borrador propio."""
+    if not servicios.puede_capturar(request.user):
+        raise PermissionDenied("Necesitas el rol SOL_MAT o VAL_MAT.")
+    solicitud = None
+    if pk:
+        solicitud = get_object_or_404(Solicitud, pk=pk, flujo=Flujo.AMPL_ZRA, solicitante=request.user)
+        if solicitud.estado != Solicitud.Estado.BORRADOR:
+            return redirect("solicitudes:detalle", pk=solicitud.pk)
+    centros = request.user.centros.filter(activo=True)
+
+    if request.method == "POST":
+        formset = ampliacion.AmpliacionFormSet(request.POST, centros=centros)
+        accion = request.POST.get("accion")
+        if accion == "eliminar" or (formset.is_valid() and not formset.renglones and accion != "enviar"):
+            if solicitud is not None:
+                servicios.eliminar_borrador(solicitud)
+                messages.success(request, "Borrador eliminado.")
+            else:
+                messages.info(request, "No había partidas; no se guardó nada.")
+            return redirect("solicitudes:mis_solicitudes")
+        if accion == "enviar":
+            if formset.validar_para_envio():
+                solicitud, omitidas = ampliacion.enviar(request.user, formset, solicitud)
+                for d in omitidas:
+                    messages.warning(request, f"Partida {d['numero']}: el material {d['codigo_sap']} ya existe en "
+                                              f"{d['centro'].codigo}; se omitió.")
+                if solicitud.folio:
+                    messages.success(request, f"Solicitud enviada con folio {solicitud.folio}.")
+                    return redirect("solicitudes:detalle", pk=solicitud.pk)
+                messages.error(request, "No existen partidas válidas: todos los materiales ya existen en su Centro nuevo.")
+                return redirect("solicitudes:editar_ampl", pk=solicitud.pk)
+            messages.error(request, "No se pudo enviar. Corrige las celdas marcadas.")
+        elif formset.is_valid():
+            solicitud = ampliacion.guardar_borrador(request.user, formset, solicitud)
+            messages.success(request, "Borrador guardado.")
+            return redirect("solicitudes:editar_ampl", pk=solicitud.pk)
+        else:
+            messages.error(request, "Hay valores inválidos; no se guardó nada. Corrige las celdas marcadas.")
+    else:
+        iniciales = ampliacion.filas_iniciales(solicitud) if solicitud else [{"numero": n} for n in range(10, 60, 10)]
+        formset = ampliacion.AmpliacionFormSet(initial=iniciales, centros=centros)
+
+    return render(request, "solicitudes/capturar_ampl.html", {
+        "solicitud": solicitud, "formset": formset, "datos_automaticos": _datos_ampliacion(centros),
+        "sin_centros": not centros.exists(),
+    })
+
+
+def _corregir_ampl(request, solicitud, editables):
+    """Corregir partidas AMPL devueltas o en validación: la misma tabla, con el id de cada partida."""
+    centros = request.user.centros.filter(activo=True)
+    es_solicitante = solicitud.solicitante_id == request.user.pk
+    puede_reenviar = es_solicitante and any(p.estado == Partida.Estado.DEVUELTA_SOL for p in editables)
+    iniciales = []
+    for p in editables:
+        a = p.ampliacion
+        iniciales.append({
+            "pid": p.pk, "numero": p.numero, "codigo_sap": a.codigo_sap, "centro": p.centro_id,
+            "almacen_destino": a.almacen_destino_id, "centro_origen": a.centro_origen_id,
+            "almacen_modelo": a.almacen_modelo_id, "planificador": a.planificador_id, "grupo_compras": a.grupo_compras_id,
+        })
+    if request.method == "POST":
+        formset = ampliacion.AmpliacionCorreccionFormSet(request.POST, initial=iniciales, centros=centros)
+        accion = request.POST.get("accion")
+        valido = formset.validar_para_envio() if accion == "reenviar" else formset.is_valid()
+        if valido:
+            devueltas = {p.pk for p in editables if p.estado == Partida.Estado.DEVUELTA_SOL}
+            try:
+                with transaction.atomic():
+                    n = ampliacion.guardar_correcciones(request.user, formset.renglones, solicitud)
+                    if accion == "reenviar":
+                        ids = [f.cleaned_data["pid"] for f in formset.renglones if f.cleaned_data["pid"] in devueltas]
+                        flujo.aplicar(request.user, "reenviar", ids)
+            except (PermissionError, flujo.AccionNoPermitida) as e:
+                messages.error(request, str(e))
+                return redirect("solicitudes:detalle", pk=solicitud.pk)
+            if accion == "reenviar":
+                messages.success(request, f"Partidas reenviadas ({n} campo(s) corregido(s)).")
+                return redirect("solicitudes:detalle", pk=solicitud.pk)
+            messages.success(request, f"Correcciones guardadas: {n} campo(s) cambiado(s).")
+            return redirect("solicitudes:corregir", pk=solicitud.pk)
+        messages.error(request, "No se guardó nada. Corrige las celdas marcadas; tus datos siguen en pantalla.")
+    else:
+        formset = ampliacion.AmpliacionCorreccionFormSet(initial=iniciales, centros=centros)
+    estados = {p.pk: p.get_estado_display() for p in editables}
+    for form in formset:
+        form.estado_partida = estados.get(_entero(form["pid"].value()), "")
+    return render(request, "solicitudes/capturar_ampl.html", {
+        "solicitud": solicitud, "formset": formset, "datos_automaticos": _datos_ampliacion(centros),
+        "correccion": True, "puede_reenviar": puede_reenviar, "es_solicitante": es_solicitante,
+    })
+
+
+@login_required
+def ampliacion_dm(request, pk):
+    """DM atiende una solicitud AMPL_ZRA: exporta Amp_Mat.txt, excluye con motivo y finaliza."""
+    solicitud = get_object_or_404(Solicitud, pk=pk, flujo=Flujo.AMPL_ZRA)
+    if "DM" not in flujo.roles_de(request.user):
+        raise PermissionDenied("Necesitas el rol DM.")
+    partidas = ampliacion.partidas_dm(request.user, solicitud)
+
+    if request.GET.get("exportar"):
+        # Exportar no es un estado ni bloquea nada (sección 10.4): se puede repetir.
+        respuesta = HttpResponse(ampliacion.texto_txt(partidas), content_type="text/plain; charset=utf-8")
+        respuesta["Content-Disposition"] = f'attachment; filename="{ampliacion.NOMBRE_TXT}"'
+        return respuesta
+
+    if request.method == "POST":
+        try:
+            if request.POST.get("accion") == "finalizar":
+                n = ampliacion.finalizar(request.user, solicitud)
+                messages.success(request, f"{n} partida(s) terminada(s); su Centro nuevo ya está en el catálogo de materiales.")
+                return redirect("solicitudes:detalle", pk=solicitud.pk)
+            ids = request.POST.getlist("partidas")
+            n = flujo.aplicar(request.user, "excluir", ids, {i: request.POST.get(f"motivo-{i}", "") for i in ids})
+            messages.success(request, f"{n} partida(s) excluida(s). Ya no salen en el TXT.")
+        except flujo.AccionNoPermitida as e:
+            messages.error(request, str(e))
+        return redirect("solicitudes:ampliacion_dm", pk=solicitud.pk)
+
+    return render(request, "solicitudes/ampliacion_dm.html", {
+        "solicitud": solicitud, "partidas": partidas,
+        "renglones": [(p, ampliacion.renglon_txt(p)) for p in partidas],
+        "excluidas": solicitud.partidas.filter(estado=Partida.Estado.EXCLUIDA).select_related("ampliacion", "centro"),
+    })

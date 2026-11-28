@@ -64,17 +64,25 @@
           <td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.solicitud.folio }}</a></td>
           <td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.numero }}</a></td>
           <td>{{ p.centro.codigo|default:"—" }}</td>
+          {% if p.solicitud.flujo == "AMPL_ZRA" %}
+            {# Ampliación: material que ya existe, hacia un Centro nuevo. #}
+            <td><a class="text-reset" href="{% url 'solicitudes:partida' p.pk %}">Ampliar {{ p.ampliacion.codigo_sap }} · {{ p.ampliacion.material.descripcion }}</a></td>
+            <td>—</td><td>—</td><td>desde {{ p.ampliacion.centro_origen.codigo|default:"—" }}</td>
+          {% else %}
           <td><a class="text-reset" href="{% url 'solicitudes:partida' p.pk %}">{{ p.alta.descripcion }}</a></td>
           <td>{{ p.alta.umb.codigo|default:"—" }}</td>
           <td>{{ p.alta.grupo_articulos.codigo|default:"—" }}</td>
           <td>{{ p.alta.no_parte_original }}</td>
+          {% endif %}
           <td>{{ p.solicitud.solicitante }}</td>
           <td title="hace {{ p.actualizada|timesince }}">{{ p.actualizada|date:"d/m/y H:i" }}</td>
           {# Motivo propio de cada partida. Al escribir, el renglón se selecciona solo (bandeja.js). #}
           <td class="wd-libre">
             {% if p.ultimo_motivo %}<div class="small text-secondary mb-1" title="Motivo de la última devolución">Última devolución: {{ p.ultimo_motivo }}</div>{% endif %}
             <textarea class="form-control form-control-sm wd-motivo" name="motivo-{{ p.pk }}" rows="1" aria-label="Motivo de {{ p.solicitud.folio }}/{{ p.numero }}">{{ p.motivo_capturado|default:'' }}</textarea></td>
-          {% if activa == "dm" %}
+          {% if activa == "dm" and p.solicitud.flujo == "AMPL_ZRA" %}
+            <td><a class="btn btn-sm btn-outline-primary" href="{% url 'solicitudes:ampliacion_dm' p.solicitud_id %}">Exportar / finalizar</a></td>
+          {% elif activa == "dm" %}
             <td class="{% if p.error_codigo %}con-error{% endif %}">
               <input class="form-control form-control-sm wd-codigo" name="codigo-{{ p.pk }}" inputmode="numeric" maxlength="6"
                      value="{{ p.codigo_capturado|default:'' }}" aria-label="Código SAP">

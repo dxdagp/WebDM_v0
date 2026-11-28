@@ -126,3 +126,9 @@ td.wd-error { background: #FFEBE9; }
 .wd-exportar-menu { position: absolute; z-index: 20; top: 100%; left: 0; margin-top: 2px; min-width: 250px; background: #fff; border: 1px solid #BFBFBF; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
 .wd-exportar-menu a, .wd-exportar-menu button { display: block; width: 100%; padding: 6px 10px; border: 0; background: none; text-align: left; color: #000; text-decoration: none; font-size: 13px; }
 .wd-exportar-menu a:hover, .wd-exportar-menu button:hover { background: #E8F3EC; }
+
+/* Fase 4c: AMPL_ZRA tiene pocas columnas; la tabla mide lo que necesita (no los 2300 px de AMAT). */
+.wd-tabla-ampl { min-width: 0; }
+.wd-tabla-ampl input, .wd-tabla-ampl select { min-width: 110px; }
+.wd-tabla-ampl td.auto input { min-width: 50px; width: 60px; }
+.wd-tabla input[type=checkbox] { display: inline-block; width: auto; min-width: 0; height: auto; margin: 0 8px; }

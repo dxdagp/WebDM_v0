@@ -150,6 +150,8 @@ class DetalleAmpliacion(models.Model):
     """Campos de AMPL_ZRA (sección 10.2). El Centro destino es `partida.centro`."""
 
     partida = models.OneToOneField(Partida, on_delete=models.CASCADE, primary_key=True, related_name="ampliacion")
+    # Lo que el usuario escribió o pegó. `material` es el del catálogo con ese código (se resuelve al guardar).
+    codigo_sap = models.CharField("Código SAP", max_length=6, blank=True)
     material = models.ForeignKey("catalogo_sap.MaterialSAP", on_delete=models.PROTECT, null=True, blank=True)
     centro_origen = models.ForeignKey(
         "catalogos.Centro", on_delete=models.PROTECT, null=True, blank=True, related_name="+"

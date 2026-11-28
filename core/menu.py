@@ -17,7 +17,7 @@ OPCIONES = [
     ("Mi trabajo", "Pendientes de mi atención", "solicitudes:pendientes", {"SOL_MAT", "VAL_MAT", "DM"}),
     ("Mi trabajo", "Mis solicitudes", "solicitudes:mis_solicitudes", {"SOL_MAT", "VAL_MAT"}),
     ("Materiales", "Crear materiales", "solicitudes:nueva_amat", {"SOL_MAT", "VAL_MAT"}),
-    ("Materiales", "Ampliar a Centro", None, {"SOL_MAT", "VAL_MAT"}),
+    ("Materiales", "Ampliar a Centro", "solicitudes:nueva_ampl", {"SOL_MAT", "VAL_MAT"}),
     ("Materiales", "Modificar materiales", None, {"SOL_MAT", "VAL_MAT"}),
     ("Servicios", "Crear servicios", None, {"SOL_MAT", "VAL_MAT"}),
     ("Servicios", "Modificar servicios", None, {"SOL_MAT", "VAL_MAT"}),

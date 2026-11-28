@@ -48,7 +48,8 @@ def con_datos_de_tabla(queryset):
         Evento.objects.filter(partida=OuterRef("pk"), tipo=Evento.Tipo.DEVOLUCION).order_by("-fecha").values("motivo")[:1]
     )
     return (
-        queryset.select_related("solicitud__solicitante", "centro", "alta__grupo_articulos", "alta__umb")
+        queryset.select_related("solicitud__solicitante", "centro", "alta__grupo_articulos", "alta__umb",
+                                 "ampliacion__material", "ampliacion__centro_origen")
         # Subquery = un SELECT dentro del SELECT: para cada partida trae el motivo de su devolución más reciente.
         .annotate(ultimo_motivo=Subquery(ultimo_motivo))
         .order_by("actualizada")
