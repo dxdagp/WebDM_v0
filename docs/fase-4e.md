@@ -10,7 +10,7 @@ Lo que definió Dave el 28-nov-2026:
 | Reglas | Las mismas del alta de materiales: descripción en mayúsculas y sin acentos (la Ñ se queda), máximo 40, y catálogos activos. |
 | Duplicados | Contra el **catálogo de servicios**. La misma descripción **bloquea**; una parecida solo **avisa**. |
 | Quién la atiende | Cualquier VAL_MAT o DM, porque los servicios no tienen Centro. |
-| DM | Escribe el **Código SAP** en su bandeja, como en las altas de materiales, y puede **exportar `Alta_Ser.txt`** con Código SAP, Descripción, UMB y Grupo de artículos. |
+| DM | Escribe el **Código SAP** en su bandeja, como en las altas de materiales, y puede **exportar `Alta_Ser.txt`** con Código SAP, Tipo de servicio, Descripción, UMB y Grupo de artículos. |
 | Al terminar | El servicio entra al **catálogo de servicios**, con origen WEBDM y el folio. |
 
 ## 1. Probarlo en tu máquina (Windows)
@@ -81,9 +81,9 @@ ALTER TABLE "solicitudes_detalleservicio" ADD COLUMN "tipo_servicio_id" bigint N
 Lleva cabecera y está separado por tabuladores (los `→` son tabuladores):
 
 ```
-Código SAP→Descripción→UMB→Grupo de artículos
-900002→ALINEACION Y BALANCEO→SER→GA1
-→LAVADO DE MOTOR→SER→GA1
+Código SAP→Tipo de servicio→Descripción→UMB→Grupo de artículos
+900002→MO→ALINEACION Y BALANCEO→SER→GA1
+→MO→LAVADO DE MOTOR→SER→GA1
 ```
 
 Si una partida todavía no tiene código, la columna va vacía. Exportar **no cambia nada**.

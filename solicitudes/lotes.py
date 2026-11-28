@@ -39,7 +39,7 @@ def seleccion(usuario, ids, flujos=EXPORTAN):
         pendientes(usuario, flujos).filter(pk__in=ids).select_related(
             "solicitud", "centro", "ampliacion__material", "ampliacion__centro_origen", "ampliacion__almacen_destino",
             "ampliacion__almacen_modelo", "ampliacion__planificador", "ampliacion__grupo_compras", "modificacion__material",
-            "servicio__umb", "servicio__grupo_articulos",
+            "servicio__umb", "servicio__grupo_articulos", "servicio__tipo_servicio",
         ).order_by("solicitud__folio", "numero")
     )
     if len(partidas) != len(ids):

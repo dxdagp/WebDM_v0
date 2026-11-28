@@ -260,11 +260,12 @@ def guardar_correcciones(usuario, forms_, solicitud):
 def texto_txt(partidas, codigos):
     """Alta_Ser.txt: con cabecera, separado por tabuladores. `codigos` = lo que DM escribió en su
     bandeja ({id de partida: código}); puede ir vacío si aún no lo tiene. Exportar no cambia nada."""
-    lineas = [["Código SAP", "Descripción", "UMB", "Grupo de artículos"]]
+    lineas = [["Código SAP", "Tipo de servicio", "Descripción", "UMB", "Grupo de artículos"]]
     for p in partidas:
         d = p.servicio
         lineas.append([
-            (codigos.get(str(p.pk)) or d.codigo_sap or "").strip(), d.descripcion,
+            (codigos.get(str(p.pk)) or d.codigo_sap or "").strip(),
+            d.tipo_servicio.codigo if d.tipo_servicio else "", d.descripcion,
             d.umb.codigo if d.umb else "", d.grupo_articulos.codigo if d.grupo_articulos else "",
         ])
     return "".join("\t".join(linea) + "\r\n" for linea in lineas)

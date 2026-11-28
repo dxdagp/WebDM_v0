@@ -117,9 +117,9 @@ class FlujoTests(Base):
         r = self.client.post(reverse("solicitudes:exportar_dm"), {"partidas": [p10.pk, p20.pk], f"codigo-{p10.pk}": "900002"})
         self.assertEqual(r["Content-Disposition"], 'attachment; filename="Alta_Ser.txt"')
         self.assertEqual(r.content.decode().split("\r\n")[:3], [
-            "Código SAP\tDescripción\tUMB\tGrupo de artículos",
-            "900002\tALINEACION Y BALANCEO\tSER\tGA1",
-            "\tLAVADO DE MOTOR\tSER\tGA1",
+            "Código SAP\tTipo de servicio\tDescripción\tUMB\tGrupo de artículos",
+            "900002\tMO\tALINEACION Y BALANCEO\tSER\tGA1",
+            "\tMO\tLAVADO DE MOTOR\tSER\tGA1",
         ])
         p10.refresh_from_db()
         self.assertEqual(p10.estado, E.EN_DM)  # exportar no cambia nada
