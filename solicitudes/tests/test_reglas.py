@@ -63,8 +63,8 @@ class AdminTests(TestCase):
         for url in [
             "admin:usuarios_usuario_changelist", "admin:usuarios_bitacorasesion_changelist",
             "admin:catalogos_centro_changelist", "admin:catalogos_almacen_changelist",
-            "admin:catalogos_categoriavaloracion_changelist", "admin:catalogo_sap_materialsap_changelist",
-            "admin:catalogo_sap_importacion_changelist", "admin:solicitudes_solicitud_changelist",
+            "admin:catalogos_categoriavaloracion_changelist", "admin:catalogo_sap_materialcatalogo_changelist", "admin:catalogo_sap_serviciocatalogo_changelist",
+            "admin:catalogo_sap_importacionmateriales_changelist", "admin:catalogo_sap_importacionservicios_changelist", "admin:solicitudes_solicitud_changelist",
             "admin:solicitudes_partida_changelist", "admin:catalogos_centro_add",
         ]:
             with self.subTest(url=url):

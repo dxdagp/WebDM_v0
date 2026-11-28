@@ -27,6 +27,9 @@ class AdminTests(TestCase):
                                               origen="IMPORT", creado_por=sol)
         MaterialCentro.objects.create(material=material, centro=c["mttu"])
         imp = Importacion.objects.create(usuario=sol, nombre_archivo="sap.txt")
+        Importacion.objects.create(usuario=sol, nombre_archivo="servicios.txt", catalogo="SERVICIOS")
+        MaterialSAP.objects.create(codigo="100001", descripcion="MANO DE OBRA", tipo_material="ZSA", es_servicio=True,
+                                   origen="IMPORT", creado_por=sol)
         ErrorImportacion.objects.create(importacion=imp, linea=2, mensaje="Centro inválido")
         TipoServicio.objects.create(codigo="MO", descripcion="Mano de obra", umb_predeterminada=c["umb"])
         Planificador.objects.create(centro=c["mttu"], codigo="P01", descripcion="Planificador 1")
@@ -53,7 +56,7 @@ class AdminTests(TestCase):
                 self.assertEqual(self.client.get(reverse("admin:%s_%s_changelist" % info)).status_code, 200)
                 if modelo_admin.has_add_permission(self.client.request().wsgi_request):
                     self.assertEqual(self.client.get(reverse("admin:%s_%s_add" % info)).status_code, 200)
-                objetos = modelo._default_manager.all()
+                objetos = modelo_admin.get_queryset(self.client.request().wsgi_request)
                 if modelo is Partida:
                     objetos = objetos.order_by("solicitud__flujo")  # todas: cada flujo tiene inlines distintos
                 else:
@@ -78,12 +81,28 @@ class AdminTests(TestCase):
         self.assertContains(r, "Sistema")
         self.assertNotContains(r, "<label>ID:</label>", html=False)
 
+    def test_materiales_y_servicios_por_separado(self):
+        """Pedido de Dave: el panel no mezcla materiales y servicios."""
+        self.client.force_login(self.admin)
+        r = self.client.get(reverse("admin:catalogo_sap_materialcatalogo_changelist"))
+        self.assertContains(r, "FILTRO")
+        self.assertNotContains(r, "MANO DE OBRA")
+        r = self.client.get(reverse("admin:catalogo_sap_serviciocatalogo_changelist"))
+        self.assertContains(r, "MANO DE OBRA")
+        self.assertNotContains(r, "FILTRO")
+        r = self.client.get(reverse("admin:catalogo_sap_importacionservicios_changelist"))
+        self.assertContains(r, "servicios.txt")
+        self.assertNotContains(r, "sap.txt")
+        r = self.client.get(reverse("admin:index"))
+        for texto in ("Catálogo de materiales", "Catálogo de servicios", "Importaciones de materiales", "Importaciones de servicios"):
+            self.assertContains(r, texto)
+
     def test_importacion_de_solo_lectura(self):
         """Pedido de Dave: en una importación no se edita nada (ni el catálogo) ni se agregan errores."""
         self.client.force_login(self.admin)
-        imp = Importacion.objects.get()
-        r = self.client.get(reverse("admin:catalogo_sap_importacion_change", args=[imp.pk]))
+        imp = Importacion.objects.get(catalogo="MATERIALES")
+        r = self.client.get(reverse("admin:catalogo_sap_importacionmateriales_change", args=[imp.pk]))
         self.assertNotContains(r, 'name="catalogo"')
         self.assertNotContains(r, 'id="detalle_errores-empty"')  # la fila en blanco para agregar errores
         self.assertNotContains(r, 'name="_save"')
-        self.assertEqual(self.client.post(reverse("admin:catalogo_sap_importacion_delete", args=[imp.pk])).status_code, 403)
+        self.assertEqual(self.client.post(reverse("admin:catalogo_sap_importacionmateriales_delete", args=[imp.pk])).status_code, 403)

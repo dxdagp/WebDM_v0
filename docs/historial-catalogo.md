@@ -57,3 +57,21 @@ ORDER BY h.fecha, h.id;
 ## Importaciones en Administración
 
 Ahora son de **solo lectura**: no se puede cambiar el catálogo, agregar errores ni eliminar una importación.
+
+## Administración: materiales y servicios por separado
+
+En el panel, la sección **Catálogo SAP** ya no mezcla materiales y servicios. Ahora tiene cuatro entradas:
+
+- **Catálogo de materiales**
+- **Catálogo de servicios**: no muestra los datos de refacción ni Centros.
+- **Importaciones de materiales**
+- **Importaciones de servicios**
+
+Son *modelos proxy* (`MaterialCatalogo`, `ServicioCatalogo`, `ImportacionMateriales`, `ImportacionServicios` en `catalogo_sap/models.py`). Usan las mismas tablas y solo filtran en el admin. Por eso la migración `0009_admin_separado` no crea tablas: solo registra los modelos para el panel y sus permisos. Es la misma separación que ya tienen las pantallas de consulta.
+
+```sql
+-- Lo que hace la lista "Catálogo de servicios"
+SELECT * FROM catalogo_sap_materialsap WHERE es_servicio ORDER BY codigo;
+```
+
+El rol ADMIN ve las cuatro entradas y también **Tipos de servicio**, que antes le faltaba (`usuarios/permisos.py`). Los permisos se actualizan solos al correr `migrate`.

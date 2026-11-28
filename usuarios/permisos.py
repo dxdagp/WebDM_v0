@@ -24,9 +24,13 @@ PERMISOS_ADMIN = [
     ("auth", "group", ["view"]),  # los roles son fijos: se asignan, no se inventan
     *[("catalogos", m, ["add", "change", "view"]) for m in (
         "centro", "almacen", "grupocompras", "planificador", "ubicacionrefaccion", "umb",
-        "grupoarticulos", "tipomaterial", "categoriavaloracion",
+        "grupoarticulos", "tipomaterial", "tiposervicio", "categoriavaloracion",
     )],
-    *[("catalogo_sap", m, ["view"]) for m in ("materialsap", "materialcentro", "importacion", "errorimportacion")],
+    *[("catalogo_sap", m, ["view"]) for m in (
+        "materialsap", "materialcentro", "importacion", "errorimportacion", "historialmaterial",
+        # Entradas separadas del panel (modelos proxy): materiales y servicios no se mezclan.
+        "materialcatalogo", "serviciocatalogo", "importacionmateriales", "importacionservicios",
+    )],
     *[("solicitudes", m, ["view"]) for m in (
         "solicitud", "partida", "evento", "detallealta", "detalleampliacion", "detallemodificacion",
         "detalleservicio", "imagenpartida", "contadorfolio",

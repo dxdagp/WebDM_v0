@@ -4,3 +4,4 @@ from django.apps import AppConfig
 class CatalogoSapConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "catalogo_sap"
+    verbose_name = "Catálogo SAP"

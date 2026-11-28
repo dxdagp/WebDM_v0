@@ -168,3 +168,35 @@ class HistorialMaterial(models.Model):
 
     def __str__(self):
         return f"{self.material.codigo} · {self.get_tipo_display()}"
+
+
+# --- Administración: materiales y servicios por separado (pedido de Dave, 28-nov-2026) -------------
+# Son modelos "proxy": NO crean tablas nuevas. Usan las mismas tablas (catalogo_sap_materialsap y
+# catalogo_sap_importacion) y solo sirven para que el panel muestre cada catálogo en su propia entrada.
+
+class MaterialCatalogo(MaterialSAP):
+    class Meta:
+        proxy = True
+        verbose_name = "material"
+        verbose_name_plural = "catálogo de materiales"
+
+
+class ServicioCatalogo(MaterialSAP):
+    class Meta:
+        proxy = True
+        verbose_name = "servicio"
+        verbose_name_plural = "catálogo de servicios"
+
+
+class ImportacionMateriales(Importacion):
+    class Meta:
+        proxy = True
+        verbose_name = "importación de materiales"
+        verbose_name_plural = "importaciones de materiales"
+
+
+class ImportacionServicios(Importacion):
+    class Meta:
+        proxy = True
+        verbose_name = "importación de servicios"
+        verbose_name_plural = "importaciones de servicios"
