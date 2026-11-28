@@ -199,10 +199,10 @@ class PantallasTests(TestCase):
         importar(txt("123456\tFILTRO\tMTTU\tZRA\tPZA\t\t"), "m.txt", self.dm, "MATERIALES")
         importar(txt("555555\tMANO DE OBRA\tZSA\tSER", encabezados=ENCABEZADOS_SERVICIOS), "s.txt", self.dm, "SERVICIOS")
         self.client.force_login(self.sol)
-        r = self.client.get(reverse("catalogo_sap:consulta"))
+        r = self.client.get(reverse("catalogo_sap:consulta"), {"buscar": 1})
         self.assertContains(r, "123456")
         self.assertNotContains(r, "555555")
-        r = self.client.get(reverse("catalogo_sap:servicios"))
+        r = self.client.get(reverse("catalogo_sap:servicios"), {"buscar": 1})
         self.assertContains(r, "555555")
         self.assertNotContains(r, "123456")
         r = self.client.get(reverse("catalogo_sap:consulta"), {"descripcion": "filt", "centro": self.c["meix"].pk})
@@ -211,7 +211,7 @@ class PantallasTests(TestCase):
     def test_materiales_un_renglon_por_material_y_centro(self):
         importar(txt("123456\tFILTRO\tMTTU\tZRA\tPZA\t\t", "123456\tFILTRO\tMEIX\tZRA\tPZA\t\t"), "m.txt", self.dm)
         self.client.force_login(self.sol)
-        r = self.client.get(reverse("catalogo_sap:consulta"))
+        r = self.client.get(reverse("catalogo_sap:consulta"), {"buscar": 1})
         self.assertEqual([(mc.material.codigo, mc.centro.codigo) for mc in r.context["pagina"]],
                          [("123456", "MEIX"), ("123456", "MTTU")])
         self.assertContains(r, "CEBE-MEIX")
@@ -272,7 +272,7 @@ class CatalogoCompletoTests(TestCase):
         self.client.force_login(self.otro)
         url = reverse("catalogo_sap:consulta")
         def codigos(**f):
-            return [mc.material.codigo for mc in self.client.get(url, f).context["pagina"]]
+            return [mc.material.codigo for mc in self.client.get(url, {"buscar": 1, **f}).context["pagina"]]
         self.assertEqual(codigos(), ["100001", "200002"])
         self.assertEqual(codigos(marca="marc"), ["100001"])
         self.assertEqual(codigos(anio="2024"), ["100001"])
@@ -285,10 +285,24 @@ class CatalogoCompletoTests(TestCase):
         self.assertNotContains(r, 'name="grupo_compras"')  # ni Grupo de compras ni CeBe (Dave)
         self.assertNotContains(r, 'name="cebe"')
 
+    def test_al_entrar_no_carga_y_buscar_vacio_carga_todo(self):
+        # Pedido de Dave: primero se filtra; con los filtros vacíos se ve todo. Bajo la tabla, cuántos resultados.
+        self.client.force_login(self.otro)
+        url = reverse("catalogo_sap:consulta")
+        r = self.client.get(url)
+        self.assertEqual(list(r.context["pagina"]), [])
+        self.assertContains(r, "Filtra lo que quieres ver")
+        self.assertNotContains(r, "resultado(s) encontrado(s)")
+        r = self.client.get(url, {"buscar": 1, "codigo": "", "descripcion": ""})
+        self.assertEqual(len(r.context["pagina"]), 2)
+        self.assertContains(r, "2 resultado(s) encontrado(s).")
+        r = self.client.get(reverse("catalogo_sap:servicios"))
+        self.assertContains(r, "Filtra lo que quieres ver")
+
     def test_ficha_del_material_con_imagenes_para_cualquier_usuario(self):
         m = MaterialSAP.objects.get(codigo="100001")
         self.client.force_login(self.otro)
-        r = self.client.get(reverse("catalogo_sap:consulta"))
+        r = self.client.get(reverse("catalogo_sap:consulta"), {"buscar": 1})
         self.assertContains(r, reverse("catalogo_sap:material", args=[m.pk]))
         r = self.client.get(reverse("catalogo_sap:material", args=[m.pk]))
         self.assertContains(r, "TRACTO")

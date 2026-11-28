@@ -172,8 +172,17 @@ WHERE p.estado IN ('EN_VALIDACION', 'DEVUELTA_SOL', 'EN_DM');
 - Corregir y reenviar.
 - Detalle y bandeja.
 
-En total pasan 171 pruebas.
+En total pasan 172 pruebas.
 
-## 10. Lo que sigue
+## 10. Catálogos: primero se filtra
+
+Dos pedidos de Dave sobre **Consulta → Catálogo de materiales / servicios**:
+
+- **Al entrar no se carga nada.** Escribes los filtros y presionas **Buscar** (o Enter). Si dejas los filtros vacíos y buscas, se muestra todo.
+- **Bajo la tabla**, en letra pequeña, sale cuántos resultados se encontraron, por ejemplo "1,250 resultado(s) encontrado(s), mostrando del 1 al 50."
+
+¿Cómo sabe la vista si ya buscaste? El formulario de filtros manda siempre un campo oculto `buscar=1`. Al entrar, la URL no trae nada y la vista usa `.none()`, un queryset que Django sabe que está vacío y que **no va a la base**: cero consultas. El botón Exportar aparece solo después de buscar.
+
+## 11. Lo que sigue
 
 Alta de servicios (ASER_ZSA) y vencimientos de 15/30 días.
