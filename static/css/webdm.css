@@ -48,6 +48,9 @@ body { background: #F5F6F8; color: #1F2328; }
 .wd-leyenda span::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px; border: 1px solid; }
 .wd-leyenda .l-auto::before { background: #F6F8FA; border-color: #D8DCE1; }
 .wd-leyenda .l-error::before { background: #FFF1F0; border-color: #CF222E; }
+/* Vencimientos (fase 4f): VENCIDA desde el día 15; aviso antes. */
+.wd-vencida { padding: 2px 8px; border-radius: 10px; background: #FFEBE9; color: #A40E26; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.wd-por-vencer { color: #6E7781; font-size: 12px; white-space: nowrap; }
 .wd-estado { padding: 2px 8px; border-radius: 10px; background: #EAEEF2; color: #424A53; font-size: 12px; font-weight: 600; white-space: nowrap; }
 
 /* --- Bandeja de pendientes (fase 3) -------------------------------------- */

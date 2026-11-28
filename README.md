@@ -30,5 +30,5 @@ La explicación paso a paso, incluida la creación de la base de datos en Postgr
 | 4c | AMPL_ZRA: ampliación a Centro y exportación Amp_Mat.txt ([guía](docs/fase-4c.md)) | Hecha |
 | 4d | MOD_ZRA y MOD_ZSA: modificación de materiales y servicios ([guía](docs/fase-4d.md)) | Hecha |
 | 4e | ASER_ZSA: alta de servicios ([guía](docs/fase-4e.md)) | Hecha |
-| 4f | Vencimientos de 15/30 días | Pendiente |
+| 4f | Vencimientos de 15/30 días ([guía](docs/fase-4f.md)) | Hecha |
 | 5 | Despliegue en Ubuntu (Nginx, Gunicorn, systemd) | Pendiente |
