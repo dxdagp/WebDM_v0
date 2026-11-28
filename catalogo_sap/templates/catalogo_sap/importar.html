@@ -22,7 +22,7 @@
     <p class="mb-1"><strong>Materiales</strong> (un renglón por material y Centro; tipo ZRA): <code>{{ columnas.MATERIALES.obligatorias|join:" · " }}</code>. Opcional: <code>NO_PARTE_ORIGINAL</code>.</p>
     <p class="mb-1"><strong>Servicios</strong> (un renglón por servicio, sin Centro; tipo ZRA o ZSA): <code>{{ columnas.SERVICIOS.obligatorias|join:" · " }}</code>.</p>
     <p class="mb-1">Los dos catálogos son independientes: un mismo código puede existir como material y como servicio.</p>
-    <p class="mb-0">Los renglones buenos se importan aunque otros tengan error. Un código que ya existe en ese catálogo no se importa (para agregar un material a otro Centro usa AMPL_ZRA). Si un material trae descripciones distintas, no se importa ninguno de sus renglones.</p>
+    <p class="mb-0">Los renglones buenos se importan aunque otros tengan error. Cada valor se valida contra los catálogos de WebDM (el CeBe debe ser el del Centro). Si el Material + Centro ya existe, ese renglón no se carga; un material existente sí se puede cargar en otro Centro. Un código tiene una sola descripción y un solo grupo de artículos: si vienen distintos, no se importa ninguno de sus renglones.</p>
   </div>
 </section>
 

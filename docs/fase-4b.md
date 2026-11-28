@@ -20,15 +20,19 @@ git fetch origin
 git checkout fase-4b
 git pull
 python manage.py migrate      # catálogo en importaciones, código único por catálogo, datos por Centro
+python manage.py datos_demo   # agrega ZSA, UMB SER y H, y el grupo de artículos SER01
 python manage.py test
 python manage.py runserver
 ```
 
 1. Entra como `dm` (o un ADMIN). En el menú aparece **Administración → Importar catálogo SAP**.
-2. Elige **Materiales** y sube `docs\ejemplos\catalogo-materiales-ejemplo.txt`. Resultado: 3 importados y 2 con error (un código de 5 dígitos y un Centro que no existe). La tabla dice en qué línea está cada error y por qué.
-3. Abre **Consulta → Catálogo de materiales**. El 310001 aparece en MEIX y MTTU, con origen IMPORT y tu usuario.
+2. Elige **Materiales** y sube `docs\ejemplos\catalogo-materiales-ejemplo.txt`. Resultado: 2 importados y 3 con error (un CeBe que no es el de MTTU, un código de 5 dígitos y un Centro que no existe). La tabla dice en qué línea está cada error y por qué.
+3. Abre **Consulta → Catálogo de materiales**. El 310001 aparece en MTTU, con origen IMPORT y tu usuario.
 4. Importa `catalogo-servicios-ejemplo.txt` eligiendo **Servicios**: entran 3. Uno de ellos es el 310001 SERVICIO DE MUELLES, el mismo código que la balata en materiales, porque los catálogos son independientes.
-5. Vuelve a importar el archivo de materiales: ahora todo es error, porque los códigos ya existen. Para agregar un Centro a un material existente está AMPL_ZRA, que viene después.
+5. Importa `catalogo-materiales-otro-centro.txt` (Materiales). Resultado: 1 importado y 2 con error.
+   - 310001 en MTTU ya existe en WebDM: no se carga.
+   - 310001 en MEIX es nuevo: se agrega MEIX al **mismo** material (no se crea otro).
+   - 310002 en MEIX trae grupo de artículos REF02, pero en WebDM es REF01: un código tiene un solo grupo de artículos.
 
 ### Cabeceras del TXT
 
@@ -43,7 +47,7 @@ Todas son obligatorias menos `NO_PARTE_ORIGINAL`.
 **Servicios**, un renglón por servicio y sin Centro:
 
 ```
-CODIGO_SAP	DESCRIPCION	TIPO_MATERIAL	UMB
+CODIGO_SAP	DESCRIPCION	TIPO_MATERIAL	UMB	GRUPO_ARTICULOS
 ```
 
 Las columnas pueden venir en cualquier orden y las desconocidas se ignoran. En Excel se guarda con **Archivo → Guardar como → "Texto Unicode (UTF-8)"** o "Texto (delimitado por tabulaciones)".
@@ -55,7 +59,23 @@ Las columnas pueden venir en cualquier orden y las desconocidas se ignoran. En E
 | Descripción, Tipo, UMB, No. Parte, Grupo de artículos | `catalogo_sap_materialsap` | Son del material, igual en todos los Centros. |
 | Grupo de compras, Categoría de valoración, CeBe | `catalogo_sap_materialcentro` | En SAP dependen del Centro. |
 
-Si un material trae grupos de artículos distintos en sus renglones, se queda el del primer renglón. Las descripciones distintas sí bloquean el código completo.
+Un código tiene **una** descripción y **un** grupo de artículos, en materiales y en servicios. Si el archivo trae distintos para el mismo código, no se carga ninguno de sus renglones. Si el código ya existe en WebDM (otro Centro), deben coincidir con los que ya tiene.
+
+### Validación contra los catálogos de WebDM
+
+Cada valor debe existir (y estar activo) en WebDM:
+
+| Columna | Se busca en |
+| --- | --- |
+| CENTRO | Centros |
+| TIPO_MATERIAL | Tipos de material |
+| UMB | Unidades de medida |
+| GRUPO_ARTICULOS | Grupos de artículos |
+| CATEGORIA_VALORACION | Categorías de valoración, **del mismo tipo de material** |
+| GRUPO_COMPRAS | Grupos de compras **de ese Centro** |
+| CEBE | Debe ser igual al CeBe del Centro |
+
+Si algo no existe, el mensaje dice todo lo que falta de una vez, por ejemplo `No existe en WebDM: UMB CAJA, Grupo de artículos GA9.`
 
 ## 2. Un catálogo por dentro, dos por fuera
 
@@ -98,21 +118,28 @@ lector = csv.reader(texto, delimiter="\t", quoting=csv.QUOTE_NONE)
 
 ### 3.2 Validar en dos pasos
 
-**Paso 1, cada renglón solo:** campos vacíos, 6 dígitos, Centro existente, 40 caracteres, ZSA en materiales y código que ya existía.
+**Paso 1, cada renglón solo:** campos vacíos, 6 dígitos, Centro existente, 40 caracteres, ZSA en materiales, valores contra los catálogos, y Material + Centro que ya existía (en servicios, el código).
 
-Para "ya existía" no se hace una consulta por renglón. Al inicio se trae una vez:
+No se hace ninguna consulta por renglón. La clase `Referencias` trae todo una vez al inicio:
 
 ```python
-existentes = set(MaterialSAP.objects.values_list("codigo", flat=True))
+ref = Referencias.cargar(servicios)
+# ref.existentes = {"310001": Existente(id=7, descripcion=..., grupo_articulos=..., centros={1, 2})}
+# ref.umbs = {"PZA", "JGO", ...}; ref.grupos_compras = {(1, "G01"), (2, "G01"), ...}
 ```
 
 ```sql
-SELECT "codigo" FROM "catalogo_sap_materialsap";
+SELECT "id", "codigo", "descripcion", "grupo_articulos" FROM "catalogo_sap_materialsap" WHERE NOT "es_servicio";
+SELECT "material_id", "centro_id" FROM "catalogo_sap_materialcentro";
+SELECT "codigo" FROM "catalogos_umb" WHERE "activo";
+-- …y así cada catálogo
 ```
 
-Preguntar `codigo in existentes` en un `set` de Python tarda lo mismo con 10 que con 100,000 códigos.
+Preguntar `centro.pk in existente.centros` o `"PZA" in ref.umbs` en un `set` de Python tarda lo mismo con 10 que con 100,000 elementos.
 
-**Paso 2, entre renglones:** se agrupan por código. Si las descripciones difieren, todos los renglones de ese código son error. Si Código + Centro se repite, el segundo es error.
+**Paso 2, entre renglones:** se agrupan por código. Si las descripciones o los grupos de artículos difieren, todos los renglones de ese código son error. Si el código ya existía en otro Centro, la descripción y el grupo de artículos deben ser los mismos que tiene en WebDM. Si Código + Centro se repite en el archivo, el segundo es error.
+
+**Al guardar**, un código que ya existía no crea otro `MaterialSAP`: su `MaterialCentro` nuevo apunta al material existente con `material_id=ref.existentes[codigo].id`.
 
 ### 3.3 Guardar en lotes
 
@@ -177,7 +204,11 @@ GROUP BY mensaje ORDER BY 2 DESC;
 - Los renglones buenos entran aunque otros fallen.
 - Cada tipo de error, con su línea.
 - Descripción distinta: no se sube ninguno.
-- Código ya existente.
+- Material + Centro ya existente: no se carga; el mismo código en otro Centro sí, sobre el mismo material.
+- Material existente con otra descripción o grupo de artículos.
+- Grupo de artículos distinto en el mismo código (materiales y servicios).
+- Valores que no existen en los catálogos de WebDM, y CeBe de otro Centro.
+- Los archivos de ejemplo dan los resultados que dice esta guía.
 - El mismo código en materiales y en servicios.
 - Catálogo de servicios sin Centro, y ZSA en materiales.
 - Columnas nuevas de materiales: grupo de compras, grupo de artículos, categoría de valoración y CeBe.
@@ -187,7 +218,7 @@ GROUP BY mensaje ORDER BY 2 DESC;
 - Permisos.
 - La consulta separa materiales y servicios.
 
-En total pasan 119 pruebas.
+En total pasan 123 pruebas.
 
 ## 7. Pendiente para la fase 5
 

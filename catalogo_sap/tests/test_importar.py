@@ -1,6 +1,6 @@
 """Fase 4b: importación del catálogo SAP (Revisión 3, sección 12 y 17.1)."""
 
-from io import BytesIO
+from io import BytesIO, StringIO
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -8,26 +8,46 @@ from django.urls import reverse
 
 from catalogo_sap.importar import ArchivoInvalido, importar
 from catalogo_sap.models import Importacion, MaterialCentro, MaterialSAP
+from catalogos.models import UMB, GrupoArticulos, GrupoCompras, TipoMaterial
 from solicitudes.tests.datos import crear_catalogos, crear_usuario
 
 # Materiales: los renglones de prueba llevan CODIGO, DESCRIPCION, CENTRO, TIPO, UMB, NO_PARTE, OTRA;
-# txt() les agrega al final GRUPO_COMPRAS, GRUPO_ARTICULOS, CATEGORIA_VALORACION y CEBE.
+# txt() les agrega al final GRUPO_COMPRAS, GRUPO_ARTICULOS, CATEGORIA_VALORACION y CEBE, válidos en WebDM
+# (el CeBe es el del Centro del renglón: CEBE-MTTU, CEBE-MEIX).
 ENCABEZADOS = ("CODIGO_SAP\tDESCRIPCION\tCENTRO\tTIPO_MATERIAL\tUMB\tNO_PARTE_ORIGINAL\tOTRA"
                "\tGRUPO_COMPRAS\tGRUPO_ARTICULOS\tCATEGORIA_VALORACION\tCEBE")
-EXTRA = "\tG01\tREF01\tCV01\tCEBE-1"
-ENCABEZADOS_SERVICIOS = "CODIGO_SAP\tDESCRIPCION\tTIPO_MATERIAL\tUMB"
+# Servicios: CODIGO, DESCRIPCION, TIPO, UMB; txt() agrega el GRUPO_ARTICULOS GA1.
+ENCABEZADOS_SERVICIOS = "CODIGO_SAP\tDESCRIPCION\tTIPO_MATERIAL\tUMB\tGRUPO_ARTICULOS"
+
+
+def con_extra(renglon):
+    if renglon.count("\t") >= 10:  # ya trae sus propias columnas extra
+        return renglon
+    centro = renglon.split("\t")[2] if renglon.count("\t") >= 2 else ""
+    return renglon + f"\tG01\tGA1\tCV1\tCEBE-{centro}"
 
 
 def txt(*renglones, encabezados=ENCABEZADOS, codificacion="utf-8"):
     if encabezados == ENCABEZADOS:
-        renglones = [r + EXTRA if r else r for r in renglones]
+        renglones = [con_extra(r) if r else r for r in renglones]
+    elif encabezados == ENCABEZADOS_SERVICIOS:
+        renglones = [r if r.count("\t") >= 4 else r + "\tGA1" for r in renglones]
     return BytesIO("\n".join([encabezados, *renglones]).encode(codificacion))
+
+
+def catalogos_para_importar():
+    c = crear_catalogos()  # Centros MTTU y MEIX, ZRA, PZA, GA1, CV1 (de ZRA), G01 en MTTU
+    GrupoCompras.objects.create(centro=c["meix"], codigo="G01")
+    UMB.objects.create(codigo="SER", descripcion="Servicio")
+    TipoMaterial.objects.create(codigo="ZSA", descripcion="Servicios")
+    GrupoArticulos.objects.create(codigo="GA2", descripcion="Balatas")
+    return c
 
 
 class ImportarTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.c = crear_catalogos()  # Centros MTTU y MEIX
+        cls.c = catalogos_para_importar()
         cls.dm = crear_usuario("dm", "DM")
 
     def importa(self, *renglones, catalogo="MATERIALES", **kw):
@@ -45,9 +65,9 @@ class ImportarTests(TestCase):
         m = MaterialSAP.objects.get()
         self.assertEqual((m.descripcion, m.origen, m.importacion, m.es_servicio), ("FILTRO DE AIRE", "IMPORT", imp, False))
         self.assertEqual(sorted(m.centros.values_list("centro__codigo", flat=True)), ["MEIX", "MTTU"])
-        self.assertEqual(m.grupo_articulos, "REF01")
-        mc = m.centros.first()
-        self.assertEqual((mc.grupo_compras, mc.categoria_valoracion, mc.cebe), ("G01", "CV01", "CEBE-1"))
+        self.assertEqual(m.grupo_articulos, "GA1")
+        mc = m.centros.get(centro__codigo="MTTU")
+        self.assertEqual((mc.grupo_compras, mc.categoria_valoracion, mc.cebe), ("G01", "CV1", "CEBE-MTTU"))
 
     def test_buenos_entran_aunque_otros_fallen(self):
         imp = self.importa(
@@ -72,11 +92,44 @@ class ImportarTests(TestCase):
         self.assertEqual((imp.importados, imp.errores), (0, 2))
         self.assertFalse(MaterialSAP.objects.exists())
 
-    def test_codigo_que_ya_existia_es_error(self):
+    def test_material_y_centro_que_ya_existen_no_se_cargan(self):
         self.importa("123456\tFILTRO\tMTTU\tZRA\tPZA\t\t")
-        imp = self.importa("123456\tFILTRO\tMEIX\tZRA\tPZA\t\t")  # otro Centro: eso es AMPL_ZRA
-        self.assertEqual((imp.importados, imp.errores), (0, 1))
+        imp = self.importa("123456\tFILTRO\tMTTU\tZRA\tPZA\t\t", "123456\tFILTRO\tMEIX\tZRA\tPZA\t\t")
+        # MTTU ya estaba: error. MEIX es nuevo: se agrega al MISMO material.
+        self.assertEqual((imp.importados, imp.errores), (1, 1))
+        self.assertIn("ya existe en WebDM para el Centro MTTU", self.errores(imp)[0][1])
+        m = MaterialSAP.objects.get()
+        self.assertEqual(sorted(m.centros.values_list("centro__codigo", flat=True)), ["MEIX", "MTTU"])
+
+    def test_material_existente_en_otro_centro_debe_coincidir(self):
+        self.importa("123456\tFILTRO\tMTTU\tZRA\tPZA\t\t")
+        imp = self.importa("123456\tBALATA\tMEIX\tZRA\tPZA\t\t")
+        self.assertIn("En WebDM el código 123456 es FILTRO", self.errores(imp)[0][1])
+        imp = self.importa("123456\tFILTRO\tMEIX\tZRA\tPZA\t\t\tG01\tGA2\tCV1\tCEBE-MEIX")
+        self.assertIn("grupo de artículos GA1", self.errores(imp)[0][1])
         self.assertEqual(MaterialCentro.objects.count(), 1)
+
+    def test_grupo_de_articulos_distinto_no_sube_ninguno(self):
+        imp = self.importa("123456\tFILTRO\tMTTU\tZRA\tPZA\t\t", "123456\tFILTRO\tMEIX\tZRA\tPZA\t\t\tG01\tGA2\tCV1\tCEBE-MEIX")
+        self.assertEqual((imp.importados, imp.errores), (0, 2))
+        self.assertIn("grupos de artículos distintos", self.errores(imp)[0][1])
+        imp = self.importa_servicios("555555\tMANO DE OBRA\tZSA\tSER\tGA1", "555555\tMANO DE OBRA\tZSA\tSER\tGA2")
+        self.assertEqual((imp.importados, imp.errores), (0, 2))
+
+    def test_valida_contra_los_catalogos_de_webdm(self):
+        imp = self.importa(
+            "111111\tA\tMTTU\tZRX\tCAJA\t\t\tG01\tGA9\tCV1\tCEBE-MTTU",  # tipo, UMB y grupo art. no existen
+            "222222\tB\tMTTU\tZRA\tPZA\t\t\tG99\tGA1\tCV9\tCEBE-MTTU",   # grupo compras y categoría
+            "333333\tC\tMTTU\tZRA\tPZA\t\t\tG01\tGA1\tCV1\tCEBE-MEIX",   # CeBe de otro Centro
+            "444444\tD\tMTTU\tZRA\tPZA\t\t\tG01\tGA1\tCV1\tCEBE-MTTU",   # bueno
+        )
+        self.assertEqual((imp.importados, imp.errores), (1, 3))
+        m = dict(self.errores(imp))
+        self.assertIn("Tipo de material ZRX, UMB CAJA, Grupo de artículos GA9", m[2])
+        self.assertIn("Categoría de valoración CV9 para ZRA, Grupo de compras G99 en MTTU", m[3])
+        self.assertIn("El CeBe de MTTU es CEBE-MTTU, no CEBE-MEIX", m[4])
+        imp = self.importa_servicios("555555\tMANO DE OBRA\tZSA\tHORA\tGA1")
+        self.assertIn("UMB HORA", self.errores(imp)[0][1])
 
     def test_servicios_es_otro_catalogo(self):
         imp = self.importa_servicios("555555\tMANO DE OBRA\tZSA\tSER", "666666\tREVISION\tZRA\tSER",
@@ -97,10 +150,11 @@ class ImportarTests(TestCase):
         # Pero dentro del mismo catálogo sigue siendo único.
         imp = self.importa_servicios("500001\tOTRO SERVICIO\tZRA\tSER")
         self.assertEqual(imp.errores, 1)
+        self.assertIn("ya existe en el catálogo de servicios", self.errores(imp)[0][1])
 
     def test_bom_y_columnas_en_otro_orden(self):
         datos = ("\ufeffUMB\tCEBE\tCENTRO\tCODIGO_SAP\tGRUPO_COMPRAS\tTIPO_MATERIAL\tGRUPO_ARTICULOS\tDESCRIPCION"
-                 "\tCATEGORIA_VALORACION\nPZA\tC1\tMTTU\t123456\tG01\tZRA\tREF01\tÑandú\tCV01\n")
+                 "\tCATEGORIA_VALORACION\nPZA\tCEBE-MTTU\tMTTU\t123456\tG01\tZRA\tGA1\tÑandú\tCV1\n")
         imp = importar(BytesIO(datos.encode("utf-8")), "a.txt", self.dm)
         self.assertEqual(imp.importados, 1)
         self.assertEqual(MaterialSAP.objects.get().descripcion, "ÑANDU")
@@ -122,7 +176,7 @@ class ImportarTests(TestCase):
 class PantallasTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.c = crear_catalogos()
+        cls.c = catalogos_para_importar()
         cls.dm = crear_usuario("dm", "DM")
         cls.sol = crear_usuario("sol", "SOL_MAT")
 
@@ -146,3 +200,28 @@ class PantallasTests(TestCase):
         self.assertNotContains(r, "123456")
         r = self.client.get(reverse("catalogo_sap:consulta"), {"q": "filt", "centro": self.c["meix"].pk})
         self.assertNotContains(r, "123456")  # existe solo en MTTU
+
+
+class EjemplosTests(TestCase):
+    """Los archivos de docs/ejemplos dan lo que dice docs/fase-4b.md."""
+
+    def test_archivos_de_ejemplo(self):
+        from pathlib import Path
+
+        from django.conf import settings
+        from django.core.management import call_command
+
+        call_command("datos_demo", stdout=StringIO())
+        dm = crear_usuario("dm2", "DM")
+        carpeta = Path(settings.BASE_DIR) / "docs" / "ejemplos"
+
+        def sube(nombre, catalogo):
+            with open(carpeta / nombre, "rb") as f:
+                imp = importar(f, nombre, dm, catalogo)
+            return imp.importados, imp.errores
+
+        self.assertEqual(sube("catalogo-materiales-ejemplo.txt", "MATERIALES"), (2, 3))
+        self.assertEqual(sube("catalogo-servicios-ejemplo.txt", "SERVICIOS"), (3, 0))
+        self.assertEqual(sube("catalogo-materiales-otro-centro.txt", "MATERIALES"), (1, 2))
+        m = MaterialSAP.objects.get(codigo="310001", es_servicio=False)
+        self.assertEqual(sorted(m.centros.values_list("centro__codigo", flat=True)), ["MEIX", "MTTU"])

@@ -40,14 +40,16 @@ class Command(BaseCommand):
 
         for modelo, valores in [
             (UbicacionRefaccion, [("MOTOR", "Motor"), ("FRENOS", "Frenos"), ("SUSP", "Suspensión")]),
-            (UMB, [("PZA", "Pieza"), ("JGO", "Juego"), ("LT", "Litro")]),
-            (GrupoArticulos, [("REF01", "Filtros"), ("REF02", "Frenos")]),
+            (UMB, [("PZA", "Pieza"), ("JGO", "Juego"), ("LT", "Litro"), ("SER", "Servicio"), ("H", "Hora")]),
+            (GrupoArticulos, [("REF01", "Filtros"), ("REF02", "Frenos"), ("SER01", "Servicios")]),
         ]:
             for codigo, descripcion in valores:
                 modelo.objects.get_or_create(codigo=codigo, defaults={"descripcion": descripcion})
 
         zra, _ = TipoMaterial.objects.get_or_create(codigo="ZRA", defaults={"descripcion": "Refacciones"})
         CategoriaValoracion.objects.get_or_create(codigo="CV01", defaults={"descripcion": "Refacción nueva", "tipo_material": zra})
+        # ZSA: solo para el catálogo de servicios importado (fase 4b).
+        TipoMaterial.objects.get_or_create(codigo="ZSA", defaults={"descripcion": "Servicios"})
 
         Usuario = get_user_model()
         for username, roles in [("solicitante", ["SOL_MAT"]), ("validador", ["SOL_MAT", "VAL_MAT"]), ("dm", ["DM"])]:
