@@ -83,8 +83,8 @@ def guardar_borrador(usuario, formset, solicitud=None):
 def revisar_envio(formset, solicitud):
     """Revisiones de la fase 4 al Enviar, después de las de campos obligatorios.
 
-    - Cada partida necesita al menos 1 imagen. Las imágenes se suben en la ficha de
-      la partida, así que la partida tiene que existir: primero se guarda el borrador.
+    - Cada partida necesita al menos 1 imagen. Se cuenta lo que ya está guardado: la vista
+      guarda el borrador con las imágenes elegidas ANTES de llamar a esta revisión.
     - Duplicados: un duplicado exacto marca la celda Descripción y bloquea; las
       advertencias y coincidencias posibles se devuelven como avisos, no bloquean.
 
@@ -107,7 +107,7 @@ def revisar_envio(formset, solicitud):
                 avisos.append(f"Partida {datos['numero']}: {c.motivo} Código {c.codigo} «{c.descripcion}».")
     if not ok and any(hasattr(f, "error_imagen") for f in formset.renglones):
         formset._non_form_errors = formset.error_class(
-            ["Cada partida necesita al menos 1 imagen. Guarda el borrador y súbelas desde la columna Imágenes."]
+            ["Cada partida necesita al menos 1 imagen. Elígela en la columna Imágenes del renglón marcado."]
         )
     return ok, avisos
 

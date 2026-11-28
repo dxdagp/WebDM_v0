@@ -18,9 +18,12 @@
   <td class="auto" data-auto="tipo">—</td>
   <td class="auto" data-auto="almacen">—</td>
   {% include "solicitudes/_celda.html" with campo=form.grupo_compras %}
-  {# Fase 4: las imágenes se suben en la ficha de la partida; el renglón tiene que estar guardado. #}
-  <td class="auto{% if form.error_imagen %} wd-error{% endif %}">
-    {% if form.guardada %}<a href="{% url 'solicitudes:partida' form.guardada.pk %}#imagenes">{{ form.guardada.n_imagenes }} de 3</a>{% else %}<span class="text-secondary" title="Guarda el borrador para poder subir imágenes">guarda primero</span>{% endif %}
+  {# Fase 4: en la captura se eligen aquí mismo (se guardan al Guardar o Enviar). En la corrección, desde la ficha. #}
+  <td class="auto wd-celda-imagenes{% if form.error_imagen %} wd-error{% endif %}">
+    {% if form.guardada %}<a href="{% url 'solicitudes:partida' form.guardada.pk %}#imagenes" title="Ver o quitar en la ficha">{{ form.guardada.n_imagenes }} de 3</a>{% endif %}
+    {% if not correccion %}
+      <input type="file" class="form-control form-control-sm" name="{{ form.prefix }}-imagenes" multiple accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" title="JPG, PNG o WebP, hasta 10 MB; máximo 3 por partida">
+    {% elif not form.guardada %}—{% endif %}
     {% if form.error_imagen %}<div class="text-danger small">{{ form.error_imagen }}</div>{% endif %}
   </td>
   <td class="auto">{% if form.pid %}{{ form.pid }}{% endif %}<span class="wd-estado">{{ form.estado_partida|default:"BORRADOR" }}</span></td>

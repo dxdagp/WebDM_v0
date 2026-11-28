@@ -35,10 +35,9 @@ python manage.py shell -c "from catalogo_sap.models import MaterialSAP; from usu
 Recorrido sugerido (contraseña `demo-webdm-2026`):
 
 1. `solicitante` abre **Crear materiales** y llena un renglón con descripción `Filtro aire`. Abajo de la tabla aparece al momento la coincidencia POSIBLE con el 100777 (88 %).
-2. Pulsa **Enviar**: no deja, porque falta la imagen. La columna **Imágenes** dice "guarda primero".
-3. **Guardar borrador**. Ahora la columna dice `0 de 3` y es una liga a la ficha de la partida.
-4. En la ficha, sube una foto (puede ser del celular). Se ve la miniatura; al darle clic se abre completa.
-5. **← Volver** regresa a la tabla. **Enviar** ya funciona y muestra el aviso amarillo de la coincidencia.
+2. Pulsa **Enviar** sin imagen: no se envía, pero queda guardada como borrador y la celda **Imágenes** se pone roja.
+3. En esa celda elige una o varias fotos (hasta 3) y pulsa **Enviar** otra vez. Se guardan y se envía en un solo paso, con el aviso amarillo de la coincidencia.
+4. Abre la partida: en la ficha ves las miniaturas, el visor con lupa y puedes quitar o agregar imágenes mientras tu rol y el estado lo permitan.
 6. Repite con descripción `Filtro de aire` y No. Parte `FA-100`: ahora es DUPLICADO y la celda Descripción se pone roja con el código 100777.
 
 ## 2. Por qué cambió "Guardar borrador"
@@ -250,7 +249,7 @@ Las pruebas guardan sus imágenes en una carpeta temporal que se borra al termin
 
 ## 7. Supuestos de esta parte
 
-1. Las imágenes se suben en la **ficha** de cada partida, no dentro de la tabla tipo Excel. Por eso la partida debe estar guardada primero.
+1. En la captura, las imágenes se eligen en la columna **Imágenes** del renglón y se guardan al pulsar Guardar o Enviar. Como el navegador no puede conservar archivos elegidos si la página regresa con error, **Enviar siempre guarda primero el borrador** con sus imágenes; si el envío no pasa, queda como borrador y no se pierde nada. Solo si hay valores inválidos (por ejemplo, un año con letras) no se guarda nada y hay que volver a elegirlas. En la corrección (DEVUELTA_SOL, EN_VALIDACION) se cambian desde la ficha.
 2. Al renumerar una partida de un borrador, sus imágenes se pierden (para WebDM es otra partida).
 3. El duplicado exacto también bloquea **Reenviar** y **Aprobar**, no solo el primer Enviar.
 4. Subir o quitar imágenes en BORRADOR no deja historia. Desde EN_VALIDACION sí, como cambio del campo "imagenes".

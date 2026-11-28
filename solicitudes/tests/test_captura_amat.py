@@ -77,10 +77,11 @@ class CapturaAmatTests(BaseCaptura):
         self.assertContains(respuesta, "Debe tener 4 dígitos")
         self.assertFalse(Solicitud.objects.exists())
 
-    def test_enviar_incompleto_marca_errores_y_no_guarda(self):
+    def test_enviar_incompleto_marca_errores_y_queda_borrador(self):
+        # Desde la fase 4 un envío que no pasa se guarda como borrador (para no perder las imágenes).
         respuesta = self.post("enviar", self.fila(marca=""))
         self.assertContains(respuesta, "Obligatorio para enviar")
-        self.assertFalse(Solicitud.objects.exists())
+        self.assertIsNone(Solicitud.objects.get().folio)
 
     def test_enviar_completo_asigna_folio_y_normaliza(self):
         solicitud = self.borrador_con_imagenes(self.fila(), self.fila(1))
@@ -164,3 +165,37 @@ class EnvioFase4Tests(BaseCaptura):
         self.assertIsNotNone(solicitud.folio)
         avisos = [str(m) for m in r.wsgi_request._messages]
         self.assertTrue(any("Misma descripción con otro No. Parte" in a for a in avisos))
+
+
+class ImagenesDesdeLaCapturaTests(BaseCaptura):
+    """Pedido de Dave: elegir las imágenes en la tabla, sin guardar antes el borrador."""
+
+    def foto(self, nombre="foto.png", contenido=None):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from solicitudes.tests.datos import imagen_png
+        return SimpleUploadedFile(nombre, contenido if contenido is not None else imagen_png(), content_type="image/png")
+
+    def test_enviar_nueva_con_imagenes_en_un_solo_paso(self):
+        filas = {**self.fila(), "form-0-imagenes": [self.foto("a.png"), self.foto("b.png")]}
+        r = self.post("enviar", filas)
+        solicitud = Solicitud.objects.get()
+        self.assertRedirects(r, reverse("solicitudes:detalle", args=[solicitud.pk]), fetch_redirect_response=False)
+        self.assertIsNotNone(solicitud.folio)
+        self.assertEqual(solicitud.partidas.get().imagenes.count(), 2)
+
+    def test_si_falta_un_dato_queda_borrador_con_sus_imagenes(self):
+        filas = {**self.fila(marca=""), "form-0-imagenes": [self.foto()]}
+        r = self.post("enviar", filas)
+        self.assertContains(r, "quedó guardada como borrador")
+        solicitud = Solicitud.objects.get()
+        self.assertIsNone(solicitud.folio)
+        self.assertEqual(solicitud.partidas.get().imagenes.count(), 1)
+        # La página sigue editando ESE borrador (no crea otro al volver a enviar).
+        self.assertContains(r, f'action="{reverse("solicitudes:editar_amat", args=[solicitud.pk])}"')
+
+    def test_imagen_invalida_no_guarda_nada(self):
+        filas = {**self.fila(), "form-0-imagenes": [self.foto("mala.png", b"no soy imagen")]}
+        r = self.post("guardar", filas)
+        self.assertContains(r, "no es una imagen válida")
+        self.assertFalse(Solicitud.objects.exists())

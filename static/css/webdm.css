@@ -98,3 +98,5 @@ td.wd-error { background: #FFEBE9; }
 .wd-visor-cerrar { right: -14px; }
 .wd-visor-descargar { right: 32px; }
 .wd-lupa { display: none; position: absolute; width: 220px; height: 220px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 16px rgba(0,0,0,.45); background-repeat: no-repeat; pointer-events: none; }
+.wd-celda-imagenes input[type=file] { width: 190px; font-size: 12px; }
+.wd-celda-imagenes a { display: block; margin-bottom: 2px; }

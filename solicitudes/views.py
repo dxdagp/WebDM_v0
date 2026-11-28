@@ -76,24 +76,37 @@ def capturar_amat(request, pk=None):
     if request.method == "POST":
         formset = PartidasFormSet(request.POST, centros=centros)
         accion = request.POST.get("accion")
-        if accion == "enviar":
-            listo = formset.validar_para_envio()
-            if listo:
-                # Fase 4: imágenes (mínimo 1) y duplicados contra el Catálogo SAP.
-                listo, avisos = servicios.revisar_envio(formset, solicitud)
-                for aviso in avisos:
-                    messages.warning(request, aviso)
-            if listo:
-                solicitud = servicios.enviar(request.user, formset, solicitud)
-                messages.success(request, f"Solicitud enviada con folio {solicitud.folio}.")
-                return redirect("solicitudes:detalle", pk=solicitud.pk)
-            messages.error(request, "No se pudo enviar. Corrige las celdas marcadas; tus datos siguen en pantalla.")
-        elif formset.is_valid():
-            solicitud = servicios.guardar_borrador(request.user, formset, solicitud)
-            messages.success(request, "Borrador guardado.")
-            return redirect("solicitudes:editar_amat", pk=solicitud.pk)
+        hay_archivos = bool(request.FILES)
+        if not formset.is_valid():
+            aviso = " Vuelve a elegir las imágenes: el navegador no las conserva." if hay_archivos else ""
+            messages.error(request, "Hay valores inválidos; no se guardó nada. Corrige las celdas marcadas." + aviso)
         else:
-            messages.error(request, "Hay valores inválidos; no se guardó nada. Corrige las celdas marcadas.")
+            # Pedido de Dave: las imágenes se eligen en la misma tabla, sin guardar antes.
+            # Por eso SIEMPRE se guarda primero el borrador con sus imágenes (una sola transacción)
+            # y después, si la acción es Enviar, se revisa todo. Si el envío no pasa, nada se pierde:
+            # queda como borrador, con las imágenes ya guardadas.
+            try:
+                with transaction.atomic():
+                    guardada = servicios.guardar_borrador(request.user, formset, solicitud)
+                    _adjuntar_imagenes(request, formset, guardada)
+                solicitud = guardada
+            except flujo.AccionNoPermitida as e:
+                messages.error(request, f"No se guardó nada: {e} Vuelve a elegir las imágenes.")
+            else:
+                if accion != "enviar":
+                    messages.success(request, "Borrador guardado.")
+                    return redirect("solicitudes:editar_amat", pk=solicitud.pk)
+                listo = formset.validar_para_envio()
+                if listo:
+                    # Fase 4: imágenes (mínimo 1) y duplicados contra el Catálogo SAP.
+                    listo, avisos = servicios.revisar_envio(formset, solicitud)
+                    for aviso in avisos:
+                        messages.warning(request, aviso)
+                if listo:
+                    solicitud = servicios.enviar(request.user, formset, solicitud)
+                    messages.success(request, f"Solicitud enviada con folio {solicitud.folio}.")
+                    return redirect("solicitudes:detalle", pk=solicitud.pk)
+                messages.error(request, "No se pudo enviar; quedó guardada como borrador (con sus imágenes). Corrige las celdas marcadas.")
     else:
         iniciales = _filas_iniciales(solicitud) if solicitud else [{"numero": n} for n in (10, 20, 30)]
         formset = PartidasFormSet(initial=iniciales, centros=centros)
@@ -330,6 +343,24 @@ def corregir(request, pk):
         "puede_reenviar": puede_reenviar,
         "es_solicitante": es_solicitante,
     })
+
+
+def _adjuntar_imagenes(request, formset, solicitud):
+    """Las imágenes elegidas en cada renglón (campo "form-N-imagenes") se agregan a su partida.
+
+    Si una falla (no es imagen, pesa más de 10 MB, ya son 3…), se marca ese renglón y se
+    relanza el error: la transacción de afuera deshace TODO, borrador incluido.
+    """
+    for form in formset.renglones:
+        archivos = request.FILES.getlist(f"{form.prefix}-imagenes")
+        if not archivos:
+            continue
+        partida = solicitud.partidas.get(numero=form.cleaned_data["numero"])
+        try:
+            imagenes.agregar(request.user, partida, archivos)
+        except flujo.AccionNoPermitida as e:
+            form.error_imagen = str(e)
+            raise flujo.AccionNoPermitida(f"partida {partida.numero}: {e}")
 
 
 def _marcar_guardadas(formset, solicitud, llave):
