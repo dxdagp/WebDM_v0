@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 # Un Código SAP son exactamente 6 dígitos. Lo validamos en dos niveles:
 # - Este validador da un mensaje claro en formularios (nivel Django).
@@ -127,3 +128,75 @@ class ErrorImportacion(models.Model):
         verbose_name = "error de importación"
         verbose_name_plural = "errores de importación"
         ordering = ["linea"]
+
+
+class HistorialMaterial(models.Model):
+    """Bitácora de cada material o servicio del catálogo (pedido de Dave, 28-nov-2026):
+    su alta, las ampliaciones a otros Centros y cada modificación, con folio y usuarios.
+
+    Se escribe en el mismo momento en que cambia el catálogo (importar, terminar un alta,
+    finalizar una ampliación o una modificación, corregir un código). Ver catalogo_sap/historial.py.
+    """
+
+    class Tipo(models.TextChoices):
+        ALTA = "ALTA", "Alta"
+        AMPLIACION = "AMPLIACION", "Ampliación a Centro"
+        MODIFICACION = "MODIFICACION", "Modificación"
+        CORRECCION_CODIGO = "CORRECCION_CODIGO", "Corrección de Código SAP"
+
+    material = models.ForeignKey(MaterialSAP, on_delete=models.CASCADE, related_name="historial")
+    fecha = models.DateTimeField(default=timezone.now)
+    tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    origen = models.CharField(max_length=10, choices=MaterialSAP.Origen.choices)
+    # De dónde vino: un folio de WebDM (partida) o una importación del TXT de SAP.
+    folio = models.CharField(max_length=30, blank=True)
+    partida = models.ForeignKey("solicitudes.Partida", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    importacion = models.ForeignKey(Importacion, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    solicitante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                    related_name="+", verbose_name="solicitó")
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                related_name="+", verbose_name="atendió", help_text="Quien lo aplicó al catálogo (DM o quien importó).")
+    centro = models.CharField(max_length=4, blank=True)
+    campo = models.CharField(max_length=40, blank=True)
+    antes = models.CharField("valor anterior", max_length=100, blank=True)
+    despues = models.CharField("valor nuevo", max_length=100, blank=True)
+
+    class Meta:
+        verbose_name = "movimiento del material"
+        verbose_name_plural = "historial de materiales"
+        ordering = ["material", "fecha", "id"]
+
+    def __str__(self):
+        return f"{self.material.codigo} · {self.get_tipo_display()}"
+
+
+# --- Administración: materiales y servicios por separado (pedido de Dave, 28-nov-2026) -------------
+# Son modelos "proxy": NO crean tablas nuevas. Usan las mismas tablas (catalogo_sap_materialsap y
+# catalogo_sap_importacion) y solo sirven para que el panel muestre cada catálogo en su propia entrada.
+
+class MaterialCatalogo(MaterialSAP):
+    class Meta:
+        proxy = True
+        verbose_name = "material"
+        verbose_name_plural = "catálogo de materiales"
+
+
+class ServicioCatalogo(MaterialSAP):
+    class Meta:
+        proxy = True
+        verbose_name = "servicio"
+        verbose_name_plural = "catálogo de servicios"
+
+
+class ImportacionMateriales(Importacion):
+    class Meta:
+        proxy = True
+        verbose_name = "importación de materiales"
+        verbose_name_plural = "importaciones de materiales"
+
+
+class ImportacionServicios(Importacion):
+    class Meta:
+        proxy = True
+        verbose_name = "importación de servicios"
+        verbose_name_plural = "importaciones de servicios"

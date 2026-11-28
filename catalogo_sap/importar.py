@@ -39,6 +39,7 @@ from django.db import IntegrityError, transaction
 from catalogos.models import UMB, CategoriaValoracion, Centro, GrupoArticulos, GrupoCompras, TipoMaterial
 from solicitudes.normalizar import texto_sap
 
+from . import historial
 from .models import ErrorImportacion, Importacion, MaterialCentro, MaterialSAP
 
 # Columnas por catálogo, en el orden recomendado para el archivo.
@@ -303,14 +304,14 @@ def importar(archivo, nombre, usuario, catalogo=Importacion.Catalogo.MATERIALES)
         # En PostgreSQL devuelve los id generados (RETURNING id), que usamos abajo.
         MaterialSAP.objects.bulk_create(materiales.values(), batch_size=LOTE)
         # Solo los materiales tienen Centro (con su grupo de compras, categoría y CeBe).
-        MaterialCentro.objects.bulk_create(
-            [MaterialCentro(material_id=(materiales[r.codigo].pk if r.codigo in materiales
-                                         else ref.existentes[r.codigo].id), centro=r.centro,
-                            grupo_compras=r.datos["GRUPO_COMPRAS"], cebe=r.datos["CEBE"],
-                            categoria_valoracion=r.datos["CATEGORIA_VALORACION"])
-             for r in resultado.buenos if r.centro],
-            batch_size=LOTE,
-        )
+        por_centro = [MaterialCentro(material_id=(materiales[r.codigo].pk if r.codigo in materiales
+                                                  else ref.existentes[r.codigo].id), centro=r.centro,
+                                     grupo_compras=r.datos["GRUPO_COMPRAS"], cebe=r.datos["CEBE"],
+                                     categoria_valoracion=r.datos["CATEGORIA_VALORACION"])
+                      for r in resultado.buenos if r.centro]
+        MaterialCentro.objects.bulk_create(por_centro, batch_size=LOTE)
+        # Historial de cada material: alta (primer Centro) y ampliaciones (los demás Centros).
+        historial.importados(importacion, materiales.values(), [(mc.material_id, mc.centro.codigo) for mc in por_centro])
     except IntegrityError:
         # Alguien dio de alta uno de estos códigos mientras leíamos el archivo.
         raise ArchivoInvalido("Otro usuario agregó materiales mientras se importaba. Vuelve a intentarlo.")

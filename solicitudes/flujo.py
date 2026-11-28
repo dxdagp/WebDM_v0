@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from catalogo_sap import historial
 from catalogo_sap.models import MaterialCentro, MaterialSAP
 
 from . import duplicados
@@ -329,6 +330,7 @@ def terminar_con_codigos(usuario, codigos):
                 categoria_valoracion=alta.categoria_valoracion.codigo if alta.categoria_valoracion else "",
                 almacen=alta.almacen.codigo if alta.almacen else "",
             )
+            historial.alta_webdm(material, usuario, p)
             anterior = p.estado
             p.estado = E.TERMINADA
             p.save(update_fields=["estado", "actualizada"])
@@ -365,7 +367,10 @@ def corregir_codigo(usuario, partida_id, nuevo, motivo):
     anterior = alta.codigo_sap
     try:
         # Se cambia el código del MISMO material: su id no cambia, así que sus Centros se conservan.
+        material = MaterialSAP.objects.filter(codigo=anterior, es_servicio=False).first()
         MaterialSAP.objects.filter(codigo=anterior, es_servicio=False).update(codigo=nuevo)
+        if material:
+            historial.correccion_codigo(material, usuario, p, anterior, nuevo)
         alta.codigo_sap = nuevo
         alta.save(update_fields=["codigo_sap"])
     except IntegrityError:

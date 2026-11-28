@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Historial de {{ m.codigo }} · WebDM{% endblock %}
+{% block contenido %}
+<div class="mb-3">
+  <div class="text-secondary small">
+    {% if m.es_servicio %}<a href="{% url 'catalogo_sap:servicios' %}">Catálogo de servicios</a>{% else %}<a href="{% url 'catalogo_sap:consulta' %}">Catálogo de materiales</a>{% endif %}
+    / <a href="{% url 'catalogo_sap:material' m.pk %}">{{ m.codigo }}</a> / Historial
+  </div>
+  <h1 class="h4 fw-bold mb-0">Historial de {{ m.codigo }} · {{ m.descripcion }}</h1>
+</div>
+<div class="wd-tabla-caja">
+  <table class="wd-tabla wd-catalogo">
+    <thead><tr><th>Fecha</th><th>Movimiento</th><th>Folio / archivo</th><th>Centro</th><th>Campo</th>
+      <th>Valor anterior</th><th>Valor nuevo</th><th>Solicitó</th><th>Atendió</th></tr></thead>
+    <tbody>
+    {% for h in movimientos %}
+      <tr>
+        <td>{{ h.fecha|date:"d/m/Y H:i" }}</td>
+        <td>{{ h.get_tipo_display }}</td>
+        <td>{% if h.partida_id %}<a href="{% url 'solicitudes:partida' h.partida_id %}">{{ h.folio }}</a>
+            {% elif h.importacion_id %}<a href="{% url 'catalogo_sap:importacion' h.importacion_id %}">Importación · {{ h.folio }}</a>
+            {% else %}{{ h.folio|default:"—" }}{% endif %}</td>
+        <td>{{ h.centro|default:"—" }}</td>
+        <td>{{ h.campo|default:"—" }}</td>
+        <td>{{ h.antes|default:"—" }}</td>
+        <td>{{ h.despues|default:"—" }}</td>
+        <td>{{ h.solicitante|default:"—" }}</td>
+        <td>{{ h.usuario|default:"—" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="9" class="text-secondary">Sin movimientos registrados.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="text-secondary small mt-2">{{ movimientos|length }} movimiento(s). "Solicitó" es quien capturó el folio; "Atendió", quien lo aplicó al catálogo (DM) o quien importó el archivo.</p>
+{% endblock %}

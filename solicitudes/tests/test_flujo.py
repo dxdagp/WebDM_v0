@@ -141,6 +141,10 @@ class CodigoSapTests(TestCase):
         self.assertEqual(self.p1.alta.codigo_sap, "100009")
         evento = self.p1.eventos.get(tipo=Evento.Tipo.CORRECCION_CODIGO_SAP)
         self.assertEqual(evento.detalle, {"antes": "100001", "despues": "100009"})
+        self.assertEqual(list(material.historial.order_by("fecha", "id").values_list("tipo", "folio", "centro", "campo", "antes", "despues")), [
+            ("ALTA", self.solicitud.folio, self.p1.centro.codigo, "", "", ""),
+            ("CORRECCION_CODIGO", self.solicitud.folio, "", "Código SAP", "100001", "100009"),
+        ])
 
 
 class ValidadoresSimultaneosTests(TransactionTestCase):
