@@ -10,9 +10,9 @@
   </div>
   {# Flechas: partida anterior y siguiente de esta misma solicitud. #}
   <nav class="wd-flechas" aria-label="Moverse entre partidas">
-    {% if anterior %}<a class="btn btn-outline-secondary" href="{% url 'solicitudes:partida' anterior.pk %}" title="Partida {{ anterior.numero }}" data-navegar>&#8592;</a>{% else %}<span class="btn btn-outline-secondary disabled" aria-hidden="true">&#8592;</span>{% endif %}
-    <span class="text-secondary small">Partida {{ posicion }} de {{ total_partidas }}</span>
-    {% if siguiente %}<a class="btn btn-outline-secondary" href="{% url 'solicitudes:partida' siguiente.pk %}" title="Partida {{ siguiente.numero }}" data-navegar>&#8594;</a>{% else %}<span class="btn btn-outline-secondary disabled" aria-hidden="true">&#8594;</span>{% endif %}
+    {% if anterior %}<a class="btn btn-primary" href="{% url 'solicitudes:partida' anterior.pk %}" title="Partida {{ anterior.numero }}" data-navegar>&#8592;</a>{% else %}<span class="btn btn-primary disabled" aria-hidden="true">&#8592;</span>{% endif %}
+    <span class="wd-flechas-texto">Partida {{ posicion }} de {{ total_partidas }}</span>
+    {% if siguiente %}<a class="btn btn-primary" href="{% url 'solicitudes:partida' siguiente.pk %}" title="Partida {{ siguiente.numero }}" data-navegar>&#8594;</a>{% else %}<span class="btn btn-primary disabled" aria-hidden="true">&#8594;</span>{% endif %}
   </nav>
 </div>
 
@@ -182,7 +182,10 @@
 {# Visor de imágenes: un solo cuadro que el JavaScript llena con la imagen elegida. #}
 <div class="wd-visor" id="visor" hidden role="dialog" aria-modal="true" aria-label="Imagen ampliada">
   <div class="wd-visor-caja">
-    <button type="button" class="wd-visor-cerrar" aria-label="Cerrar">&times;</button>
+    <a class="wd-visor-boton wd-visor-descargar" href="#" download aria-label="Descargar imagen" title="Descargar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+    </a>
+    <button type="button" class="wd-visor-boton wd-visor-cerrar" aria-label="Cerrar" title="Cerrar">&times;</button>
     <img alt="" title="Clic para abrir en tamaño completo en otra pestaña">
     <div class="wd-lupa" aria-hidden="true"></div>
   </div>

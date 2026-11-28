@@ -548,6 +548,10 @@ def ver_imagen(request, pk):
         archivo = imagen.archivo.open("rb")
     except FileNotFoundError:
         raise Http404("El archivo de la imagen no está en el disco.")
+    if request.GET.get("descargar"):
+        # as_attachment manda "Content-Disposition: attachment": el navegador la guarda en vez de mostrarla.
+        nombre = f"{imagen.partida.solicitud.folio or 'borrador'}-partida-{imagen.partida.numero}-imagen-{imagen.orden}.webp"
+        return FileResponse(archivo, content_type="image/webp", as_attachment=True, filename=nombre)
     respuesta = FileResponse(archivo, content_type="image/webp")
     respuesta["Cache-Control"] = "private, max-age=3600"
     return respuesta

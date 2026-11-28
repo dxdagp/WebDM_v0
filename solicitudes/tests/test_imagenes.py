@@ -151,3 +151,13 @@ class FlechasFichaTests(TestCase):
         self.assertContains(r, "Partida 2 de 3")
         r = self.client.get(reverse("solicitudes:partida", args=[p10.pk]))
         self.assertIsNone(r.context["anterior"])
+
+
+class DescargaTests(TestCase):
+    def test_descargar_manda_como_adjunto(self):
+        c = crear_catalogos()
+        sol = crear_usuario("sol", "SOL_MAT", centros=[c["mttu"]])
+        imagen = crear_enviada(c, sol, n=1).partidas.get().imagenes.get()
+        self.client.force_login(sol)
+        r = self.client.get(reverse("solicitudes:ver_imagen", args=[imagen.pk]), {"descargar": 1})
+        self.assertIn('attachment; filename="AMAT_ZRA-2026-000001-partida-10-imagen-1.webp"', r["Content-Disposition"])

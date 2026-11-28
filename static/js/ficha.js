@@ -21,6 +21,7 @@
     function abrir(url, texto) {
       img.src = url;
       img.alt = texto;
+      visor.querySelector(".wd-visor-descargar").href = url + "?descargar=1";
       visor.hidden = false;
       document.body.style.overflow = "hidden"; // que la página de atrás no se desplace
     }

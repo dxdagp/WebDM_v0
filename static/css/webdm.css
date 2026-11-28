@@ -85,12 +85,16 @@ td.wd-error { background: #FFEBE9; }
 
 /* Flechas entre partidas y visor de imágenes (ficha) */
 .wd-flechas { display: flex; align-items: center; gap: 8px; }
-.wd-flechas .btn { min-width: 44px; font-size: 18px; line-height: 1; padding: 6px 10px; }
+.wd-flechas .btn { min-width: 52px; height: 44px; font-size: 24px; font-weight: 700; line-height: 1; padding: 6px 12px; box-shadow: 0 2px 6px rgba(9,105,218,.3); }
+.wd-flechas .btn.disabled { box-shadow: none; opacity: .35; }
+.wd-flechas-texto { font-weight: 600; font-size: 14px; min-width: 110px; text-align: center; }
 .wd-imagen a { cursor: zoom-in; }
 .wd-visor { position: fixed; inset: 0; z-index: 1050; background: rgba(15, 20, 25, .78); display: flex; align-items: center; justify-content: center; }
 .wd-visor[hidden] { display: none; }
 .wd-visor-caja { position: relative; }
 .wd-visor-caja img { display: block; max-width: 85vw; max-height: 85vh; border-radius: 6px; background: #fff; cursor: none; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
-.wd-visor-cerrar { position: absolute; top: -14px; right: -14px; width: 36px; height: 36px; border-radius: 50%; border: 0; background: #fff; color: #1F2328; font-size: 24px; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,.35); z-index: 2; }
-.wd-visor-cerrar:hover { background: #F3F4F6; }
-.wd-lupa { display: none; position: absolute; width: 180px; height: 180px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 16px rgba(0,0,0,.45); background-repeat: no-repeat; pointer-events: none; }
+.wd-visor-boton { position: absolute; top: -14px; width: 36px; height: 36px; border-radius: 50%; border: 0; background: #fff; color: #1F2328; font-size: 24px; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,.35); z-index: 2; display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.wd-visor-boton:hover { background: #F3F4F6; color: #1F2328; }
+.wd-visor-cerrar { right: -14px; }
+.wd-visor-descargar { right: 32px; }
+.wd-lupa { display: none; position: absolute; width: 220px; height: 220px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 16px rgba(0,0,0,.45); background-repeat: no-repeat; pointer-events: none; }

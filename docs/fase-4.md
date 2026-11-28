@@ -104,8 +104,9 @@ En la ficha de la partida (`static/js/ficha.js`):
 
 - **Clic en la miniatura**: la imagen se ve grande en el centro de la pantalla, ajustada a la ventana (máximo 85 % del ancho y del alto), no en su tamaño real.
 - **Cerrar**: con el tache de arriba a la derecha, con un clic fuera de la imagen o con Esc.
-- **Lupa**: al pasar el cursor sobre la imagen, un círculo muestra esa zona 2.5 veces más grande. Es un `<div>` redondo cuyo fondo es la misma imagen, agrandada y recorrida según la posición del cursor.
+- **Lupa**: al pasar el cursor sobre la imagen, un círculo de 220 px muestra esa zona 2.5 veces más grande. Es un `<div>` redondo cuyo fondo es la misma imagen, agrandada y recorrida según la posición del cursor.
 - **Clic sobre la imagen ampliada**: se abre completa en otra pestaña.
+- **Ícono de descarga** (a la izquierda del tache): guarda la imagen como `FOLIO-partida-10-imagen-1.webp`. Es la misma vista `ver_imagen` con `?descargar=1`, que responde con `Content-Disposition: attachment`.
 - **Flechas ← →** junto al título: van a la partida anterior o siguiente **de la misma solicitud**, por número. Si cambiaste datos sin guardar, preguntan antes de salir.
 
 El SQL de "siguiente" es tan simple como suena:
