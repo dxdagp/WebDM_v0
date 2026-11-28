@@ -150,8 +150,25 @@ SELECT fecha, tipo, motivo FROM solicitudes_evento WHERE tipo = 'EXCLUSION' ORDE
 - La bandeja y el detalle muestran la ampliación.
 - Corregir y reenviar una partida devuelta, con su evento de cambio.
 
-En total pasan 145 pruebas.
+- Enter (Validar) revisa sin enviar, en AMAT y en AMPL.
 
-## 8. Lo que sigue
+En total pasan 149 pruebas.
+
+## 8. Enter valida, no envía (AMAT y AMPL)
+
+Pedido de Dave: en una tabla de captura, **Enter** ya no envía la solicitud. Ahora valida.
+
+¿Por qué Enter enviaba? En HTML, Enter dentro de un `<input>` "presiona" el **primer botón de envío** del formulario. En AMAT ese era "Eliminar borrador" o "Guardar borrador", y en AMPL "Guardar". La solución fue poner como primer botón uno invisible, `value="validar"` (clase `.wd-enter`). También hay un botón **Validar** visible.
+
+Validar hace lo siguiente:
+
+- Revisa todo como al enviar: obligatorios, valores contra catálogos y, en AMAT, imágenes y duplicados.
+- Marca los errores en rojo.
+- Guarda como **borrador**, para no perder lo capturado ni las imágenes elegidas.
+- **No** asigna folio ni envía.
+
+En AMPL, además, avisa qué renglones se omitirán por estar ya ampliados.
+
+## 9. Lo que sigue
 
 Modificaciones (MOD_ZRA y MOD_ZSA), alta de servicios (ASER_ZSA) y vencimientos de 15/30 días.

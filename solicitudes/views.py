@@ -81,7 +81,7 @@ def capturar_amat(request, pk=None):
         formset = PartidasFormSet(request.POST, centros=centros)
         accion = request.POST.get("accion")
         hay_archivos = bool(request.FILES)
-        if accion == "eliminar" or (formset.is_valid() and not formset.renglones and accion != "enviar"):
+        if accion == "eliminar" or (formset.is_valid() and not formset.renglones and accion not in ("enviar", "validar")):
             # Un borrador sin partidas no sirve de nada: se elimina en vez de quedar vacío
             # en "Mis solicitudes" (Revisión 3: lo que nunca entró al flujo puede eliminarse).
             if solicitud is not None:
@@ -90,7 +90,7 @@ def capturar_amat(request, pk=None):
             else:
                 messages.info(request, "No había partidas; no se guardó nada.")
             return redirect("solicitudes:mis_solicitudes")
-        if accion == "enviar" and formset.is_valid() and not formset.renglones:
+        if accion in ("enviar", "validar") and formset.is_valid() and not formset.renglones:
             messages.error(request, "Agrega al menos una partida antes de enviar.")
         elif not formset.is_valid():
             aviso = " Vuelve a elegir las imágenes: el navegador no las conserva." if hay_archivos else ""
@@ -108,7 +108,7 @@ def capturar_amat(request, pk=None):
             except flujo.AccionNoPermitida as e:
                 messages.error(request, f"No se guardó nada: {e} Vuelve a elegir las imágenes.")
             else:
-                if accion != "enviar":
+                if accion not in ("enviar", "validar"):
                     messages.success(request, "Borrador guardado.")
                     return redirect("solicitudes:editar_amat", pk=solicitud.pk)
                 listo = formset.validar_para_envio()
@@ -117,11 +117,19 @@ def capturar_amat(request, pk=None):
                     listo, avisos = servicios.revisar_envio(formset, solicitud)
                     for aviso in avisos:
                         messages.warning(request, aviso)
-                if listo:
+                if accion == "validar":
+                    # Pedido de Dave: Enter (o el botón Validar) revisa todo como si fuera a enviar,
+                    # pero NO envía. Se guarda como borrador para no perder lo capturado ni las imágenes.
+                    if listo:
+                        messages.success(request, "Validación correcta: la solicitud está lista para enviar. Se guardó como borrador.")
+                        return redirect("solicitudes:editar_amat", pk=solicitud.pk)
+                    messages.error(request, "La validación encontró errores (marcados en rojo). Se guardó como borrador; no se envió.")
+                elif listo:
                     solicitud = servicios.enviar(request.user, formset, solicitud)
                     messages.success(request, f"Solicitud enviada con folio {solicitud.folio}.")
                     return redirect("solicitudes:detalle", pk=solicitud.pk)
-                messages.error(request, "No se pudo enviar; quedó guardada como borrador (con sus imágenes). Corrige las celdas marcadas.")
+                else:
+                    messages.error(request, "No se pudo enviar; quedó guardada como borrador (con sus imágenes). Corrige las celdas marcadas.")
     else:
         iniciales = _filas_iniciales(solicitud) if solicitud else [{"numero": n} for n in range(10, 60, 10)]  # 5 renglones vacíos (10 a 50); los vacíos se ignoran al guardar
         formset = PartidasFormSet(initial=iniciales, centros=centros)
@@ -679,14 +687,27 @@ def capturar_ampl(request, pk=None):
     if request.method == "POST":
         formset = ampliacion.AmpliacionFormSet(request.POST, centros=centros)
         accion = request.POST.get("accion")
-        if accion == "eliminar" or (formset.is_valid() and not formset.renglones and accion != "enviar"):
+        if accion == "eliminar" or (formset.is_valid() and not formset.renglones and accion not in ("enviar", "validar")):
             if solicitud is not None:
                 servicios.eliminar_borrador(solicitud)
                 messages.success(request, "Borrador eliminado.")
             else:
                 messages.info(request, "No había partidas; no se guardó nada.")
             return redirect("solicitudes:mis_solicitudes")
-        if accion == "enviar":
+        if accion == "validar":
+            # Pedido de Dave: Enter (o el botón Validar) revisa todo como al enviar, pero no envía.
+            if formset.is_valid() and formset.renglones:
+                solicitud = ampliacion.guardar_borrador(request.user, formset, solicitud)
+            if formset.validar_para_envio():
+                for f in formset.renglones:
+                    if ampliacion.ya_ampliado(f.material, f.cleaned_data["centro"]):
+                        messages.warning(request, f"Partida {f.cleaned_data['numero']}: el material ya existe en "
+                                                  f"{f.cleaned_data['centro'].codigo}; se omitirá al enviar.")
+                messages.success(request, "Validación correcta: la solicitud está lista para enviar. Se guardó como borrador.")
+                return redirect("solicitudes:editar_ampl", pk=solicitud.pk)
+            guardado = " Se guardó como borrador." if solicitud else ""
+            messages.error(request, f"La validación encontró errores (marcados en rojo); no se envió.{guardado}")
+        elif accion == "enviar":
             if formset.validar_para_envio():
                 solicitud, omitidas = ampliacion.enviar(request.user, formset, solicitud)
                 for d in omitidas:

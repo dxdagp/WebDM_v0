@@ -132,3 +132,6 @@ td.wd-error { background: #FFEBE9; }
 .wd-tabla-ampl input, .wd-tabla-ampl select { min-width: 110px; }
 .wd-tabla-ampl td.auto input { min-width: 50px; width: 60px; }
 .wd-tabla input[type=checkbox] { display: inline-block; width: auto; min-width: 0; height: auto; margin: 0 8px; }
+
+/* Botón por omisión del formulario de captura: existe para que Enter valide, pero no se ve. */
+.wd-enter { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }

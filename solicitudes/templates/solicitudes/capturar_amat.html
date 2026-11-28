@@ -5,6 +5,9 @@
 {# multipart: sin esto el navegador no manda los archivos. action: una vez guardado, se sigue editando ESE borrador. #}
 <form method="post" id="form-captura" novalidate enctype="multipart/form-data"{% if solicitud %} action="{% url 'solicitudes:editar_amat' solicitud.pk %}"{% endif %}>
   {% csrf_token %}
+  {# Enter en una celda "presiona" el PRIMER botón de envío del formulario. Este botón invisible va #}
+  {# primero para que Enter valide (pedido de Dave) en vez de enviar, guardar o eliminar. #}
+  <button type="submit" name="accion" value="validar" class="wd-enter" tabindex="-1" aria-hidden="true">Validar</button>
   {# management_form lleva cuántos renglones hay (TOTAL_FORMS). El JavaScript lo actualiza al agregar renglones. #}
   {{ formset.management_form }}
 
@@ -19,6 +22,7 @@
     </div>
     <div class="d-flex gap-2">
       {% if solicitud %}<button type="submit" name="accion" value="eliminar" class="btn btn-outline-danger" formnovalidate onclick="return confirm('¿Eliminar este borrador con todas sus partidas e imágenes? No se puede deshacer.');">Eliminar borrador</button>{% endif %}
+      <button type="submit" name="accion" value="validar" class="btn btn-outline-primary" title="Revisa todo como al enviar, sin enviar (también con Enter)">Validar</button>
       <button type="submit" name="accion" value="guardar" class="btn btn-outline-secondary">Guardar borrador</button>
       <button type="submit" name="accion" value="enviar" class="btn btn-primary fw-semibold">Enviar</button>
     </div>

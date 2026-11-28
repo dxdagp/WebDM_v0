@@ -176,3 +176,27 @@ class MenuTests(Base):
         r = self.client.get(reverse("solicitudes:mis_solicitudes"))
         self.assertContains(r, reverse("solicitudes:nueva_ampl"))
         self.assertEqual(Flujo.AMPL_ZRA, "AMPL_ZRA")
+
+
+class EnterValidaTests(Base):
+    """Pedido de Dave: Enter no envía; valida lo capturado (y lo guarda como borrador)."""
+
+    def test_validar_no_envia(self):
+        r = self.post(self.sol, "validar", self.renglon())
+        self.assertContains(r, "Validación correcta")
+        s = Solicitud.objects.get()
+        self.assertEqual((s.estado, s.folio), ("BORRADOR", None))
+
+    def test_validar_marca_errores(self):
+        r = self.post(self.sol, "validar", self.renglon(codigo="999999"))
+        self.assertContains(r, "La validación encontró errores")
+        self.assertContains(r, "No existe en el catálogo de materiales")
+        self.assertFalse(Solicitud.objects.exists())
+
+    def test_enter_dispara_validar(self):
+        # El primer botón de envío del formulario es el que usa Enter: debe ser "validar".
+        self.client.force_login(self.sol)
+        for url in (reverse("solicitudes:nueva_ampl"), reverse("solicitudes:nueva_amat")):
+            html = self.client.get(url).content.decode()
+            form = html[html.index('id="form-captura"'):]
+            self.assertIn('value="validar"', form[:form.index('type="submit"') + 80])
