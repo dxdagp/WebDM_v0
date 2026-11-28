@@ -193,7 +193,7 @@ class FichaPartidaTests(TestCase):
         self.assertNotContains(r, "FILTRO 1")
         self.assertContains(r, 'value="aprobar"')
         self.assertContains(r, 'value="devolver"')
-        self.assertContains(r, "Imagen 1")
+        self.assertContains(r, "Imagen 1")  # la de crear_enviada
 
     def test_validador_corrige_y_aprueba_desde_la_ficha(self):
         self.client.force_login(self.val)

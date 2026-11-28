@@ -25,16 +25,25 @@ body { background: #F5F6F8; color: #1F2328; }
 .wd-salir button:hover { background: #FFF1F0; }
 
 /* --- Tabla tipo Excel ---------------------------------------------------- */
-.wd-tabla-caja { overflow-x: auto; background: #fff; border: 1px solid #D8DCE1; border-radius: 8px; }
-.wd-tabla { border-collapse: collapse; font-size: 13px; min-width: 2300px; }
-.wd-tabla th { background: #F6F8FA; color: #424A53; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #D8DCE1; white-space: nowrap; text-align: left; }
-.wd-tabla td { padding: 4px 6px; border-bottom: 1px solid #EAEEF2; vertical-align: top; }
-.wd-tabla th.auto, .wd-tabla td.auto { background: #F6F8FA; color: #57606A; white-space: nowrap; }
-.wd-tabla input, .wd-tabla select { width: 100%; min-width: 90px; border: 1px solid transparent; border-radius: 4px; padding: 5px 6px; background: transparent; font: inherit; }
-.wd-tabla input:focus, .wd-tabla select:focus { border-color: #1D4ED8; outline: none; background: #fff; }
+/* Tabla de captura con aspecto de hoja de Excel (pedido de Dave, 28-nov-2026):
+   cuadrícula gris en todas las celdas, encabezados grises centrados, celdas sin cajas
+   ni esquinas redondeadas y el borde verde de Excel en la celda activa. */
+.wd-tabla-caja { overflow-x: auto; background: #fff; border: 1px solid #BFBFBF; }
+.wd-tabla { border-collapse: collapse; font-family: Calibri, "Segoe UI", Arial, sans-serif; font-size: 13px; min-width: 2300px; }
+.wd-tabla th { background: #F3F3F3; color: #333; font-weight: 400; padding: 3px 6px; border: 1px solid #D4D4D4; white-space: nowrap; text-align: center; }
+.wd-tabla td { padding: 0; border: 1px solid #D4D4D4; vertical-align: middle; height: 24px; }
+.wd-tabla th.auto { background: #E9E9E9; }
+.wd-tabla td.auto { background: #F2F2F2; color: #595959; white-space: nowrap; padding: 0 6px; }
+.wd-tabla input, .wd-tabla select { display: block; width: 100%; min-width: 90px; height: 24px; border: 0; border-radius: 0; padding: 0 5px; background: transparent; font: inherit; color: #000; }
+.wd-tabla select { -webkit-appearance: none; appearance: none; padding-right: 14px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23777'/%3E%3C/svg%3E") no-repeat right 4px center; }
+.wd-tabla input:focus, .wd-tabla select:focus { outline: 2px solid #217346; outline-offset: -2px; background-color: #fff; }
 .wd-tabla td.ancha input { min-width: 260px; }
 .wd-tabla td.con-error { background: #FFF1F0; box-shadow: inset 0 0 0 1px #CF222E; }
-.wd-tabla .error-celda { display: block; color: #A40E26; font-size: 12px; padding: 0 6px; }
+.wd-tabla .error-celda { display: block; color: #A40E26; font-size: 11px; padding: 0 5px 2px; }
+.wd-tabla input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.wd-tabla input[type=number] { -moz-appearance: textfield; }
+.wd-tabla input[type=file] { height: auto; font-size: 11px; padding: 2px 4px; }
 .wd-leyenda { display: flex; flex-wrap: wrap; gap: 24px; color: #57606A; font-size: 13px; }
 .wd-leyenda span::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px; border: 1px solid; }
 .wd-leyenda .l-auto::before { background: #F6F8FA; border-color: #D8DCE1; }
@@ -75,3 +84,28 @@ body { background: #F5F6F8; color: #1F2328; }
 .wd-contenido table .wd-libre { white-space: normal; min-width: 120px; }
 .wd-contenido .nav-link { font-size: 13px; padding: 6px 12px; }
 .wd-contenido .error-celda { white-space: normal; }
+
+/* Fase 4: imágenes y coincidencias */
+.wd-imagen { width: 180px; margin: 0; }
+.wd-imagen img { width: 180px; height: 135px; object-fit: cover; border: 1px solid #D0D7DE; border-radius: 6px; background: #F6F8FA; display: block; }
+td.wd-error { background: #FFEBE9; }
+.wd-coincidencias { border: 1px solid #D0D7DE; border-radius: 6px; padding: 8px 12px; background: #FFFDF5; }
+.wd-coincidencias .bloquea { color: #B42318; font-weight: 600; }
+
+/* Flechas entre partidas y visor de imágenes (ficha) */
+.wd-flechas { display: flex; align-items: center; gap: 8px; }
+.wd-flechas .btn { min-width: 52px; height: 44px; font-size: 24px; font-weight: 700; line-height: 1; padding: 6px 12px; box-shadow: 0 2px 6px rgba(9,105,218,.3); }
+.wd-flechas .btn.disabled { box-shadow: none; opacity: .35; }
+.wd-flechas-texto { font-weight: 600; font-size: 14px; min-width: 110px; text-align: center; }
+.wd-imagen a { cursor: zoom-in; }
+.wd-visor { position: fixed; inset: 0; z-index: 1050; background: rgba(15, 20, 25, .78); display: flex; align-items: center; justify-content: center; }
+.wd-visor[hidden] { display: none; }
+.wd-visor-caja { position: relative; }
+.wd-visor-caja img { display: block; max-width: 85vw; max-height: 85vh; border-radius: 6px; background: #fff; cursor: none; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+.wd-visor-boton { position: absolute; top: -14px; width: 36px; height: 36px; border-radius: 50%; border: 0; background: #fff; color: #1F2328; font-size: 24px; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,.35); z-index: 2; display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.wd-visor-boton:hover { background: #F3F4F6; color: #1F2328; }
+.wd-visor-cerrar { right: -14px; }
+.wd-visor-descargar { right: 32px; }
+.wd-lupa { display: none; position: absolute; width: 220px; height: 220px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 16px rgba(0,0,0,.45); background-repeat: no-repeat; pointer-events: none; }
+.wd-celda-imagenes input[type=file] { width: 190px; }
+.wd-celda-imagenes a { display: block; padding: 0 5px; }

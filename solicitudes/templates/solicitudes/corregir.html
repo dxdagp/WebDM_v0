@@ -27,11 +27,11 @@
     <table class="wd-tabla">
       <thead>
         <tr>
-          <th class="auto">Partida</th><th>Centro</th><th class="auto">CeBe</th>
-          <th>Descripción técnica del material</th><th>Ubicación de la refacción</th><th>No. Parte Original</th>
+          <th class="auto">Partida</th><th class="auto">Tipo de Material</th><th>Centro</th>
+          <th>Descripción técnica del material</th><th>UMB</th><th>Grupo de compras</th><th>Grupo de artículos</th>
+          <th>Categoría de valoración</th><th>Ubicación de la refacción</th><th>No. Parte Original</th>
           <th>Tipo de Unidad</th><th>Marca de la unidad</th><th>Versión</th><th>Año modelo</th>
-          <th>Compatibilidad</th><th>UMB</th><th>Grupo de artículos</th><th>Categoría de valoración</th>
-          <th class="auto">Tipo de Material</th><th class="auto">Almacén</th><th>Grupo de compras</th>
+          <th>Compatibilidad</th><th>Almacén</th><th class="auto">CeBe</th>
           <th class="auto">Imágenes</th><th class="auto">Estado</th>
         </tr>
       </thead>
@@ -40,7 +40,11 @@
       </tbody>
     </table>
   </div>
+  <div class="d-flex flex-wrap align-items-start gap-2 mt-3">
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="buscar-coincidencias">Buscar coincidencias</button>
+    <div id="wd-coincidencias" class="wd-coincidencias small flex-grow-1" data-url="{% url 'solicitudes:coincidencias' %}" aria-live="polite">Escribe una descripción o un No. Parte para ver coincidencias con el Catálogo SAP.</div>
+  </div>
 </form>
 {{ datos_automaticos|json_script:"datos-automaticos" }}
 {% endblock %}
-{% block scripts %}<script src="{% static 'js/captura.js' %}"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'js/captura.js' %}"></script><script src="{% static 'js/coincidencias.js' %}"></script>{% endblock %}

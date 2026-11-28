@@ -51,8 +51,8 @@
       <thead>
         <tr>
           <th><input type="checkbox" id="todas" aria-label="Seleccionar todas"></th>
-          <th>Folio</th><th>Partida</th><th>Centro</th><th>Descripción técnica</th><th>No. Parte</th><th>UMB</th>
-          <th>Grupo art.</th><th>Solicitante</th><th>En espera desde</th><th>Motivo</th>
+          <th>Folio</th><th>Partida</th><th>Centro</th><th>Descripción técnica</th><th>UMB</th><th>Grupo art.</th>
+          <th>No. Parte</th><th>Solicitante</th><th>En espera desde</th><th>Motivo</th>
           {% if activa == "dm" %}<th>Código SAP</th>{% endif %}
         </tr>
       </thead>
@@ -65,9 +65,9 @@
           <td><a href="{% url 'solicitudes:partida' p.pk %}">{{ p.numero }}</a></td>
           <td>{{ p.centro.codigo|default:"—" }}</td>
           <td><a class="text-reset" href="{% url 'solicitudes:partida' p.pk %}">{{ p.alta.descripcion }}</a></td>
-          <td>{{ p.alta.no_parte_original }}</td>
           <td>{{ p.alta.umb.codigo|default:"—" }}</td>
           <td>{{ p.alta.grupo_articulos.codigo|default:"—" }}</td>
+          <td>{{ p.alta.no_parte_original }}</td>
           <td>{{ p.solicitud.solicitante }}</td>
           <td title="hace {{ p.actualizada|timesince }}">{{ p.actualizada|date:"d/m/y H:i" }}</td>
           {# Motivo propio de cada partida. Al escribir, el renglón se selecciona solo (bandeja.js). #}

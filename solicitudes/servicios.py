@@ -10,13 +10,26 @@ from django.utils import timezone
 
 from catalogos.models import Almacen
 
+from . import duplicados
 from .folios import siguiente_folio
-from .models import DetalleAlta, Evento, Flujo, Partida, Solicitud
+from .models import DetalleAlta, Evento, Flujo, ImagenPartida, Partida, Solicitud
 
 CAMPOS_DETALLE = [
-    "descripcion", "ubicacion", "no_parte_original", "tipo_unidad", "marca", "version", "anio_modelo",
-    "compatibilidad", "umb", "grupo_articulos", "categoria_valoracion", "grupo_compras",
+    "descripcion", "umb", "grupo_compras", "grupo_articulos", "categoria_valoracion", "ubicacion",
+    "no_parte_original", "tipo_unidad", "marca", "version", "anio_modelo", "compatibilidad", "almacen",
 ]
+
+
+def almacen_predeterminado(centro):
+    """El almacén que se propone para un Centro: el predeterminado; si no hay, el primero
+    activo por código (pedido de Dave: proponer el primer dato que aparezca).
+
+    SQL: ... WHERE centro_id = 3 AND activo ORDER BY predeterminado DESC, codigo LIMIT 1
+    (en PostgreSQL TRUE va después de FALSE, por eso DESC pone primero al predeterminado).
+    """
+    if not centro:
+        return None
+    return Almacen.objects.filter(centro=centro, activo=True).order_by("-predeterminado", "codigo").first()
 
 
 def puede_capturar(usuario):
@@ -24,22 +37,57 @@ def puede_capturar(usuario):
 
 
 def _reemplazar_partidas(solicitud, formset):
-    """Borra las partidas del borrador y las vuelve a crear desde la tabla.
+    """Hace que las partidas del borrador queden igual que la tabla.
 
+    Se identifican por su NÚMERO de partida (10, 20, 30…):
+    - número que ya existía: se actualizan sus datos (UPDATE) y conserva sus imágenes;
+    - número nuevo: se crea (INSERT);
+    - número que ya no está en la tabla: se borra con sus imágenes (DELETE).
     Se vale borrar porque un BORRADOR nunca entró al flujo formal
     (Revisión 3: "lo que nunca entró al flujo puede eliminarse").
+
+    Hasta la fase 3 se borraban todas y se volvían a crear; con imágenes eso ya no
+    sirve, porque el CASCADE se llevaría las fotos en cada "Guardar borrador".
     """
-    solicitud.partidas.all().delete()  # CASCADE borra también sus DetalleAlta
+    existentes = {p.numero: p for p in solicitud.partidas.select_related("alta")}
     for form in formset.renglones:
         datos = form.cleaned_data
-        partida = Partida.objects.create(solicitud=solicitud, numero=datos["numero"], centro=datos["centro"])
-        detalle = DetalleAlta(partida=partida, **{c: datos.get(c) for c in CAMPOS_DETALLE})
+        partida = existentes.pop(datos["numero"], None)
+        if partida is None:
+            partida = Partida.objects.create(solicitud=solicitud, numero=datos["numero"], centro=datos["centro"])
+            detalle = DetalleAlta(partida=partida)
+        else:
+            partida.centro = datos["centro"]
+            partida.save(update_fields=["centro", "actualizada"])
+            detalle = partida.alta
+        for c in CAMPOS_DETALLE:
+            setattr(detalle, c, datos.get(c))
         # Campos automáticos (no se capturan):
-        if detalle.categoria_valoracion:
-            detalle.tipo_material = detalle.categoria_valoracion.tipo_material
-        if partida.centro:
-            detalle.almacen = Almacen.objects.filter(centro=partida.centro, predeterminado=True, activo=True).first()
+        detalle.tipo_material = detalle.categoria_valoracion.tipo_material if detalle.categoria_valoracion else None
+        if detalle.almacen is None:  # vacío = el predeterminado del Centro
+            detalle.almacen = almacen_predeterminado(partida.centro)
         detalle.save()
+    for sobrante in existentes.values():
+        borrar_archivos_al_confirmar(sobrante.imagenes.all())
+        sobrante.delete()  # CASCADE borra su DetalleAlta y los renglones de sus imágenes
+
+
+@transaction.atomic
+def eliminar_borrador(solicitud):
+    """Borra un BORRADOR completo: cabecera, partidas, detalle, eventos e imágenes.
+    Solo BORRADOR: lo que ya entró al flujo nunca se borra (se cancela)."""
+    if solicitud.estado != Solicitud.Estado.BORRADOR:
+        raise ValueError("Solo se puede eliminar un borrador.")
+    borrar_archivos_al_confirmar(ImagenPartida.objects.filter(partida__solicitud=solicitud))
+    solicitud.delete()  # CASCADE: partidas, DetalleAlta, ImagenPartida y Evento
+
+
+def borrar_archivos_al_confirmar(imagenes):
+    """Los renglones se van con el CASCADE, pero los archivos en disco no: se borran
+    cuando la transacción se confirma (si se deshiciera, las fotos seguirían ahí)."""
+    for imagen in imagenes:
+        archivo = imagen.archivo
+        transaction.on_commit(lambda a=archivo: a.storage.delete(a.name))
 
 
 @transaction.atomic
@@ -50,6 +98,38 @@ def guardar_borrador(usuario, formset, solicitud=None):
         Evento.objects.create(solicitud=solicitud, usuario=usuario, tipo=Evento.Tipo.CREACION)
     _reemplazar_partidas(solicitud, formset)
     return solicitud
+
+
+def revisar_envio(formset, solicitud):
+    """Revisiones de la fase 4 al Enviar, después de las de campos obligatorios.
+
+    - Cada partida necesita al menos 1 imagen. Se cuenta lo que ya está guardado: la vista
+      guarda el borrador con las imágenes elegidas ANTES de llamar a esta revisión.
+    - Duplicados: un duplicado exacto marca la celda Descripción y bloquea; las
+      advertencias y coincidencias posibles se devuelven como avisos, no bloquean.
+
+    Devuelve (ok, avisos).
+    """
+    con_imagen = set()
+    if solicitud is not None:
+        con_imagen = set(solicitud.partidas.filter(imagenes__isnull=False).values_list("numero", flat=True))
+    ok, avisos = True, []
+    for form in formset.renglones:
+        datos = form.cleaned_data
+        if datos["numero"] not in con_imagen:
+            form.error_imagen = "Falta al menos 1 imagen."
+            ok = False
+        for c in duplicados.buscar(datos.get("descripcion"), datos.get("no_parte_original")):
+            if c.bloquea:
+                form.add_error("descripcion", f"Duplicado: ya existe el código {c.codigo} ({c.descripcion}, No. Parte {c.no_parte or '—'}, UMB {c.umb or '—'}).")
+                ok = False
+            else:
+                avisos.append(f"Partida {datos['numero']}: {c.motivo} Código {c.codigo} «{c.descripcion}».")
+    if not ok and any(hasattr(f, "error_imagen") for f in formset.renglones):
+        formset._non_form_errors = formset.error_class(
+            ["Cada partida necesita al menos 1 imagen. Elígela en la columna Imágenes del renglón marcado."]
+        )
+    return ok, avisos
 
 
 @transaction.atomic
@@ -124,6 +204,9 @@ def guardar_correcciones(usuario, forms, solicitud):
         alta = partida.alta
         nuevos = {c: datos.get(c) for c in CAMPOS_DETALLE}
         nuevos["centro"] = datos.get("centro")
+        # Almacén vacío = el propuesto del Centro. Se resuelve ANTES de comparar para no
+        # registrar un cambio falso ("RC01 → vacío") cuando en realidad sigue igual.
+        nuevos["almacen"] = nuevos["almacen"] or almacen_predeterminado(nuevos["centro"])
         for campo, nuevo in nuevos.items():
             destino = partida if campo == "centro" else alta
             actual = getattr(destino, campo)
@@ -136,12 +219,10 @@ def guardar_correcciones(usuario, forms, solicitud):
             )
             setattr(destino, campo, nuevo)
             cambios += 1
-        # Los automáticos se recalculan siempre en el servidor.
+        # Tipo de Material se recalcula siempre en el servidor; el almacén vacío toma el predeterminado.
         alta.tipo_material = alta.categoria_valoracion.tipo_material if alta.categoria_valoracion else None
-        alta.almacen = (
-            Almacen.objects.filter(centro=partida.centro, predeterminado=True, activo=True).first()
-            if partida.centro else None
-        )
+        if alta.almacen is None:
+            alta.almacen = almacen_predeterminado(partida.centro)
         partida.save()
         alta.save()
     return cambios

@@ -20,6 +20,7 @@ from django.utils import timezone
 
 from catalogo_sap.models import MaterialCentro, MaterialSAP
 
+from . import duplicados
 from .forms import CAMPOS_OBLIGATORIOS_ENVIO
 from .models import DetalleAlta, Evento, Partida, Solicitud
 
@@ -79,7 +80,16 @@ def faltantes(partida):
             valor, nombre = getattr(alta, field.attname), field.verbose_name
         if valor in (None, ""):
             vacios.append(nombre)
+    # Fase 4: mínimo 1 imagen por partida de alta (Revisión 3, sección 7.3).
+    if partida.solicitud.flujo == "AMAT_ZRA" and not partida.imagenes.exists():
+        vacios.append("al menos 1 imagen")
     return vacios
+
+
+def duplicado_de(partida):
+    """El material del Catálogo SAP que duplica EXACTO a esta partida (sección 8), o None."""
+    alta = partida.alta
+    return duplicados.bloqueante(alta.descripcion, alta.no_parte_original)
 
 
 def _bloquear(ids):
@@ -172,6 +182,14 @@ def aplicar(usuario, accion, ids, motivo=""):
                 incompletas.append(f"{p.solicitud.folio}/{p.numero} (falta: {', '.join(vacios)})")
         if incompletas:
             raise AccionNoPermitida("No se movió ninguna. Partidas incompletas: " + "; ".join(incompletas))
+        # Fase 4: validación final de duplicados. Un duplicado exacto bloquea (sección 8).
+        repetidas = []
+        for p in partidas:
+            d = duplicado_de(p)
+            if d:
+                repetidas.append(f"{p.solicitud.folio}/{p.numero} (ya existe el código {d.codigo})")
+        if repetidas:
+            raise AccionNoPermitida("No se movió ninguna. Duplicados en el Catálogo SAP: " + "; ".join(repetidas))
 
     hacia = t.hacia
     # Igual que en el primer envío: si quien reenvía también es VAL_MAT, va directo a DM.
@@ -237,6 +255,10 @@ def terminar_con_codigos(usuario, codigos):
         error = _error_codigo(codigo)
         if not error and codigo in vistos:
             error = "Código repetido en esta captura."
+        # Fase 4: tampoco se termina una partida sin imágenes (p. ej. una que llegó a DM antes
+        # de esta fase). DM la devuelve a VAL_MAT para que le suban al menos una.
+        if not error and p.solicitud.flujo == "AMAT_ZRA" and not p.imagenes.exists():
+            error = "La partida no tiene imágenes. Devuélvela a VAL_MAT."
         vistos.setdefault(codigo, p.pk)
         if error:
             errores[p.pk] = error

@@ -4,7 +4,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Count
 from django.forms import Select
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import urlencode
@@ -12,9 +14,9 @@ from django.views.decorators.http import require_POST
 
 from catalogos.models import Almacen, CategoriaValoracion, GrupoCompras
 
-from . import bandejas, flujo, servicios
+from . import bandejas, duplicados, flujo, imagenes, servicios
 from .forms import CorreccionFormSet, PartidaCorreccionForm, PartidasFormSet
-from .models import Flujo, Partida, Solicitud
+from .models import Flujo, ImagenPartida, Partida, Solicitud
 
 
 @login_required
@@ -33,11 +35,14 @@ def _datos_automaticos(centros):
     de Centro o de Categoría. El servidor vuelve a calcularlos al guardar: lo
     que muestra el navegador es solo una ayuda visual.
     """
-    almacenes = Almacen.objects.filter(centro__in=centros, predeterminado=True, activo=True)
+    # Almacén propuesto por Centro: el predeterminado o, si no hay, el primero por código.
+    almacenes = {}
+    for a in Almacen.objects.filter(centro__in=centros, activo=True).order_by("-predeterminado", "codigo"):
+        almacenes.setdefault(a.centro_id, a)
     grupos = GrupoCompras.objects.filter(centro__in=centros, predeterminado=True, activo=True)
     return {
         "cebe": {str(c.pk): c.centro_beneficio for c in centros},
-        "almacen": {str(a.centro_id): a.codigo for a in almacenes},
+        "almacenPredeterminado": {str(c): str(a.pk) for c, a in almacenes.items()},
         "grupoPredeterminado": {str(g.centro_id): str(g.pk) for g in grupos},
         "tipoMaterial": {
             str(c.pk): c.tipo_material.codigo for c in CategoriaValoracion.objects.select_related("tipo_material")
@@ -74,22 +79,53 @@ def capturar_amat(request, pk=None):
     if request.method == "POST":
         formset = PartidasFormSet(request.POST, centros=centros)
         accion = request.POST.get("accion")
-        if accion == "enviar":
-            if formset.validar_para_envio():
-                solicitud = servicios.enviar(request.user, formset, solicitud)
-                messages.success(request, f"Solicitud enviada con folio {solicitud.folio}.")
-                return redirect("solicitudes:detalle", pk=solicitud.pk)
-            messages.error(request, "No se pudo enviar. Corrige las celdas marcadas; tus datos siguen en pantalla.")
-        elif formset.is_valid():
-            solicitud = servicios.guardar_borrador(request.user, formset, solicitud)
-            messages.success(request, "Borrador guardado.")
-            return redirect("solicitudes:editar_amat", pk=solicitud.pk)
+        hay_archivos = bool(request.FILES)
+        if accion == "eliminar" or (formset.is_valid() and not formset.renglones and accion != "enviar"):
+            # Un borrador sin partidas no sirve de nada: se elimina en vez de quedar vacío
+            # en "Mis solicitudes" (Revisión 3: lo que nunca entró al flujo puede eliminarse).
+            if solicitud is not None:
+                servicios.eliminar_borrador(solicitud)
+                messages.success(request, "Borrador eliminado.")
+            else:
+                messages.info(request, "No había partidas; no se guardó nada.")
+            return redirect("solicitudes:mis_solicitudes")
+        if accion == "enviar" and formset.is_valid() and not formset.renglones:
+            messages.error(request, "Agrega al menos una partida antes de enviar.")
+        elif not formset.is_valid():
+            aviso = " Vuelve a elegir las imágenes: el navegador no las conserva." if hay_archivos else ""
+            messages.error(request, "Hay valores inválidos; no se guardó nada. Corrige las celdas marcadas." + aviso)
         else:
-            messages.error(request, "Hay valores inválidos; no se guardó nada. Corrige las celdas marcadas.")
+            # Pedido de Dave: las imágenes se eligen en la misma tabla, sin guardar antes.
+            # Por eso SIEMPRE se guarda primero el borrador con sus imágenes (una sola transacción)
+            # y después, si la acción es Enviar, se revisa todo. Si el envío no pasa, nada se pierde:
+            # queda como borrador, con las imágenes ya guardadas.
+            try:
+                with transaction.atomic():
+                    guardada = servicios.guardar_borrador(request.user, formset, solicitud)
+                    _adjuntar_imagenes(request, formset, guardada)
+                solicitud = guardada
+            except flujo.AccionNoPermitida as e:
+                messages.error(request, f"No se guardó nada: {e} Vuelve a elegir las imágenes.")
+            else:
+                if accion != "enviar":
+                    messages.success(request, "Borrador guardado.")
+                    return redirect("solicitudes:editar_amat", pk=solicitud.pk)
+                listo = formset.validar_para_envio()
+                if listo:
+                    # Fase 4: imágenes (mínimo 1) y duplicados contra el Catálogo SAP.
+                    listo, avisos = servicios.revisar_envio(formset, solicitud)
+                    for aviso in avisos:
+                        messages.warning(request, aviso)
+                if listo:
+                    solicitud = servicios.enviar(request.user, formset, solicitud)
+                    messages.success(request, f"Solicitud enviada con folio {solicitud.folio}.")
+                    return redirect("solicitudes:detalle", pk=solicitud.pk)
+                messages.error(request, "No se pudo enviar; quedó guardada como borrador (con sus imágenes). Corrige las celdas marcadas.")
     else:
-        iniciales = _filas_iniciales(solicitud) if solicitud else [{"numero": n} for n in (10, 20, 30)]
+        iniciales = _filas_iniciales(solicitud) if solicitud else [{"numero": n} for n in range(10, 60, 10)]  # 5 renglones vacíos (10 a 50); los vacíos se ignoran al guardar
         formset = PartidasFormSet(initial=iniciales, centros=centros)
 
+    _marcar_guardadas(formset, solicitud, "numero")
     return render(request, "solicitudes/capturar_amat.html", {
         "solicitud": solicitud,
         "formset": formset,
@@ -313,6 +349,7 @@ def corregir(request, pk):
     estados = {p.pk: p.get_estado_display() for p in editables}
     for form in formset:
         form.estado_partida = estados.get(_entero(form["pid"].value()), "")
+    _marcar_guardadas(formset, solicitud, "pid")
     return render(request, "solicitudes/corregir.html", {
         "solicitud": solicitud,
         "formset": formset,
@@ -320,6 +357,39 @@ def corregir(request, pk):
         "puede_reenviar": puede_reenviar,
         "es_solicitante": es_solicitante,
     })
+
+
+def _adjuntar_imagenes(request, formset, solicitud):
+    """Las imágenes elegidas en cada renglón (campo "form-N-imagenes") se agregan a su partida.
+
+    Si una falla (no es imagen, pesa más de 10 MB, ya son 3…), se marca ese renglón y se
+    relanza el error: la transacción de afuera deshace TODO, borrador incluido.
+    """
+    for form in formset.renglones:
+        archivos = request.FILES.getlist(f"{form.prefix}-imagenes")
+        if not archivos:
+            continue
+        partida = solicitud.partidas.get(numero=form.cleaned_data["numero"])
+        try:
+            imagenes.agregar(request.user, partida, archivos)
+        except flujo.AccionNoPermitida as e:
+            form.error_imagen = str(e)
+            raise flujo.AccionNoPermitida(f"partida {partida.numero}: {e}")
+
+
+def _marcar_guardadas(formset, solicitud, llave):
+    """Fase 4: a cada renglón le pega su partida ya guardada (con cuántas imágenes tiene),
+    para la columna Imágenes. Un renglón nuevo, que aún no se guarda, queda en None.
+
+    `llave` es "numero" en la captura (el borrador se identifica por número de partida)
+    o "pid" en la corrección (cada renglón trae el id de su partida).
+    """
+    guardadas = {}
+    if solicitud is not None:
+        for p in solicitud.partidas.annotate(n_imagenes=Count("imagenes")):
+            guardadas[p.numero if llave == "numero" else p.pk] = p
+    for form in formset.forms:
+        form.guardada = guardadas.get(_entero(form[llave].value()))
 
 
 def _entero(valor):
@@ -386,7 +456,7 @@ def partida(request, pk):
         for campo in form.fields.values():  # estilo de Bootstrap para cada control
             campo.widget.attrs["class"] = "form-select" if isinstance(campo.widget, Select) else "form-control"
 
-    volver = f"{reverse('solicitudes:pendientes')}?tab={PESTANA_DE_ESTADO.get(p.estado, '')}"
+    volver = _volver_de_ficha(request.user, p)
 
     if request.method == "POST":
         accion = request.POST.get("accion", "")
@@ -433,4 +503,110 @@ def partida(request, pk):
         "eventos": p.eventos.select_related("usuario").order_by("fecha"),
         "volver": volver,
         "cebe": p.centro.centro_beneficio if p.centro else "",
+        # Fase 4
+        "imagenes": p.imagenes.all(),
+        "edita_imagenes": imagenes.puede_editar(request.user, p),
+        "lugares_libres": imagenes.MAX_IMAGENES - p.imagenes.count(),
+        "coincidencias": _coincidencias_de(p),
+        **_vecinas(p),
     })
+
+
+def _vecinas(p):
+    """La partida anterior y la siguiente de la MISMA solicitud, por número (pedido de Dave:
+    flechas para moverse entre partidas sin regresar a la lista).
+
+    SQL de "siguiente": ... WHERE solicitud_id = 7 AND numero > 20 ORDER BY numero LIMIT 1
+    """
+    hermanas = Partida.objects.filter(solicitud_id=p.solicitud_id)
+    numeros = list(hermanas.order_by("numero").values_list("numero", flat=True))
+    return {
+        "anterior": hermanas.filter(numero__lt=p.numero).order_by("-numero").first(),
+        "siguiente": hermanas.filter(numero__gt=p.numero).order_by("numero").first(),
+        "posicion": numeros.index(p.numero) + 1,
+        "total_partidas": len(numeros),
+    }
+
+
+def _volver_de_ficha(usuario, p):
+    """A dónde regresa el enlace de la ficha: un borrador vuelve a su tabla de captura;
+    lo que está en una bandeja, a esa pestaña; lo demás, a la solicitud completa."""
+    if p.estado == Partida.Estado.BORRADOR:
+        return reverse("solicitudes:editar_amat", args=[p.solicitud_id])
+    pestana = PESTANA_DE_ESTADO.get(p.estado)
+    if pestana:
+        return f"{reverse('solicitudes:pendientes')}?tab={pestana}"
+    return reverse("solicitudes:detalle", args=[p.solicitud_id])
+
+
+def _coincidencias_de(p):
+    """Duplicados en el Catálogo SAP. Se omite el propio código si la partida ya terminó
+    (si no, toda partida TERMINADA saldría como duplicado de sí misma)."""
+    if p.solicitud.flujo != Flujo.AMAT_ZRA:
+        return []
+    propio = p.alta.codigo_sap
+    return [c for c in duplicados.buscar(p.alta.descripcion, p.alta.no_parte_original) if c.codigo != propio]
+
+
+# --- Fase 4: imágenes y búsqueda de coincidencias --------------------------------------------
+
+
+@login_required
+@require_POST
+def subir_imagenes(request, pk):
+    p = get_object_or_404(Partida.objects.select_related("solicitud"), pk=pk)
+    archivos = request.FILES.getlist("imagenes")
+    if not archivos:
+        messages.error(request, "Elige al menos una imagen.")
+    else:
+        try:
+            n = imagenes.agregar(request.user, p, archivos)
+            messages.success(request, f"{n} imagen(es) agregada(s).")
+        except flujo.AccionNoPermitida as e:
+            messages.error(request, str(e))
+    return redirect("solicitudes:partida", pk=p.pk)
+
+
+@login_required
+@require_POST
+def quitar_imagen(request, pk):
+    imagen = get_object_or_404(ImagenPartida, pk=pk)
+    try:
+        imagenes.quitar(request.user, imagen)
+        messages.success(request, f"Imagen {imagen.orden} quitada.")
+    except flujo.AccionNoPermitida as e:
+        messages.error(request, str(e))
+    return redirect("solicitudes:partida", pk=imagen.partida_id)
+
+
+@login_required
+def ver_imagen(request, pk):
+    """Sirve el archivo SOLO a quien puede ver la solicitud.
+
+    Por eso las imágenes no se publican en /media/ como un archivo estático: cualquiera
+    con la liga podría verlas. Aquí cada petición pasa por puede_ver.
+    """
+    imagen = get_object_or_404(ImagenPartida.objects.select_related("partida__solicitud"), pk=pk)
+    if not puede_ver(request.user, imagen.partida.solicitud):
+        raise PermissionDenied("Esta imagen no es tuya ni de tus Centros.")
+    try:
+        archivo = imagen.archivo.open("rb")
+    except FileNotFoundError:
+        raise Http404("El archivo de la imagen no está en el disco.")
+    if request.GET.get("descargar"):
+        # as_attachment manda "Content-Disposition: attachment": el navegador la guarda en vez de mostrarla.
+        nombre = f"{imagen.partida.solicitud.folio or 'borrador'}-partida-{imagen.partida.numero}-imagen-{imagen.orden}.webp"
+        return FileResponse(archivo, content_type="image/webp", as_attachment=True, filename=nombre)
+    respuesta = FileResponse(archivo, content_type="image/webp")
+    respuesta["Cache-Control"] = "private, max-age=3600"
+    return respuesta
+
+
+@login_required
+def coincidencias(request):
+    """JSON para "Buscar coincidencias" y el aviso mientras se escribe.
+
+    Ejemplo: GET /solicitudes/coincidencias/?descripcion=FILTRO%20AIRE&no_parte=ABC-1
+    """
+    resultados = duplicados.buscar(request.GET.get("descripcion", ""), request.GET.get("no_parte", ""))
+    return JsonResponse({"coincidencias": [c.como_dict() for c in resultados]})

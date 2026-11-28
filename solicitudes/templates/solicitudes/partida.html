@@ -1,12 +1,19 @@
 {% extends "base.html" %}
-{% block titulo %}{{ solicitud.folio }}/{{ p.numero }} · WebDM{% endblock %}
+{% load static %}
+{% block titulo %}{{ solicitud.folio|default:"Borrador" }}/{{ p.numero }} · WebDM{% endblock %}
 {% block contenido %}
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
   <div>
-    <div class="text-secondary small"><a href="{{ volver }}">Pendientes de mi atención</a> / Partida</div>
-    <h1 class="h4 fw-bold mb-1">{{ solicitud.folio }} · Partida {{ p.numero }} <span class="wd-estado align-middle">{{ p.get_estado_display }}</span></h1>
+    <div class="text-secondary small"><a href="{{ volver }}">← Volver</a></div>
+    <h1 class="h4 fw-bold mb-1">{{ solicitud.folio|default:"Borrador" }} · Partida {{ p.numero }} <span class="wd-estado align-middle">{{ p.get_estado_display }}</span></h1>
     <div class="text-secondary">{{ solicitud.get_flujo_display }} · solicitante {{ solicitud.solicitante }} · <a href="{% url 'solicitudes:detalle' solicitud.pk %}">ver la solicitud completa</a></div>
   </div>
+  {# Flechas: partida anterior y siguiente de esta misma solicitud. #}
+  <nav class="wd-flechas" aria-label="Moverse entre partidas">
+    {% if anterior %}<a class="btn btn-primary" href="{% url 'solicitudes:partida' anterior.pk %}" title="Partida {{ anterior.numero }}" data-navegar>&#8592;</a>{% else %}<span class="btn btn-primary disabled" aria-hidden="true">&#8592;</span>{% endif %}
+    <span class="wd-flechas-texto">Partida {{ posicion }} de {{ total_partidas }}</span>
+    {% if siguiente %}<a class="btn btn-primary" href="{% url 'solicitudes:partida' siguiente.pk %}" title="Partida {{ siguiente.numero }}" data-navegar>&#8594;</a>{% else %}<span class="btn btn-primary disabled" aria-hidden="true">&#8594;</span>{% endif %}
+  </nav>
 </div>
 
 {# Un solo formulario: los datos (si puedes editarlos), el motivo, el código y el botón de la acción. #}
@@ -19,6 +26,7 @@
       <section class="wd-ficha">
         <h2 class="h6 fw-bold mb-3">Datos de la partida {% if form %}<small class="text-secondary fw-normal">(puedes corregirlos)</small>{% endif %}</h2>
         <div class="wd-campos">
+          {# Mismo orden que la tabla (definido por Dave): Tipo de Material después de Partida y CeBe después de Almacén. #}
           {% if form %}
             {% for campo in form.visible_fields %}
               <div class="wd-campo{% if campo.name == 'descripcion' or campo.name == 'compatibilidad' %} ancho{% endif %}">
@@ -26,14 +34,20 @@
                 {{ campo }}
                 {% for e in campo.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
               </div>
-              {% if campo.name == "centro" %}<div class="wd-campo"><span class="form-label">CeBe</span><div class="wd-valor auto">{{ cebe|default:"—" }}</div></div>{% endif %}
+              {% if campo.name == "numero" %}<div class="wd-campo"><span class="form-label">Tipo de Material</span><div class="wd-valor auto">{{ p.alta.tipo_material.codigo|default:"—" }}</div></div>{% endif %}
+              {% if campo.name == "almacen" %}<div class="wd-campo"><span class="form-label">CeBe</span><div class="wd-valor auto">{{ cebe|default:"—" }}</div></div>{% endif %}
             {% endfor %}
+            <div class="wd-campo ancho"><span class="form-label">Coincidencias mientras escribes</span><div id="wd-coincidencias" class="wd-coincidencias small" data-url="{% url 'solicitudes:coincidencias' %}" aria-live="polite">Al cambiar la descripción o el No. Parte verás aquí si ya existe en el Catálogo SAP.</div></div>
           {% else %}
             {% with a=p.alta %}
-            <div class="wd-campo"><span class="form-label">Partida</span><div class="wd-valor">{{ p.numero }}</div></div>
+            <div class="wd-campo"><span class="form-label">Partida</span><div class="wd-valor">{{ p.numero|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Tipo de Material</span><div class="wd-valor auto">{{ p.alta.tipo_material.codigo|default:"—" }}</div></div>
             <div class="wd-campo"><span class="form-label">Centro</span><div class="wd-valor">{{ p.centro.codigo|default:"—" }}</div></div>
-            <div class="wd-campo"><span class="form-label">CeBe</span><div class="wd-valor auto">{{ cebe|default:"—" }}</div></div>
             <div class="wd-campo ancho"><span class="form-label">Descripción técnica del material</span><div class="wd-valor">{{ a.descripcion|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Unidad de medida base</span><div class="wd-valor">{{ a.umb|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Grupo de compras</span><div class="wd-valor">{{ a.grupo_compras|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Grupo de artículos</span><div class="wd-valor">{{ a.grupo_articulos|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Categoría de valoración</span><div class="wd-valor">{{ a.categoria_valoracion|default:"—" }}</div></div>
             <div class="wd-campo"><span class="form-label">Ubicación de la refacción</span><div class="wd-valor">{{ a.ubicacion|default:"—" }}</div></div>
             <div class="wd-campo"><span class="form-label">No. Parte Original</span><div class="wd-valor">{{ a.no_parte_original|default:"—" }}</div></div>
             <div class="wd-campo"><span class="form-label">Tipo de Unidad</span><div class="wd-valor">{{ a.tipo_unidad|default:"—" }}</div></div>
@@ -41,26 +55,14 @@
             <div class="wd-campo"><span class="form-label">Versión de la Unidad</span><div class="wd-valor">{{ a.version|default:"—" }}</div></div>
             <div class="wd-campo"><span class="form-label">Año modelo</span><div class="wd-valor">{{ a.anio_modelo|default:"—" }}</div></div>
             <div class="wd-campo ancho"><span class="form-label">Compatibilidad entre unidades</span><div class="wd-valor">{{ a.compatibilidad|default:"—" }}</div></div>
-            <div class="wd-campo"><span class="form-label">Unidad de medida base</span><div class="wd-valor">{{ a.umb|default:"—" }}</div></div>
-            <div class="wd-campo"><span class="form-label">Grupo de artículos</span><div class="wd-valor">{{ a.grupo_articulos|default:"—" }}</div></div>
-            <div class="wd-campo"><span class="form-label">Categoría de valoración</span><div class="wd-valor">{{ a.categoria_valoracion|default:"—" }}</div></div>
-            <div class="wd-campo"><span class="form-label">Grupo de compras</span><div class="wd-valor">{{ a.grupo_compras|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">Almacén</span><div class="wd-valor">{{ a.almacen|default:"—" }}</div></div>
+            <div class="wd-campo"><span class="form-label">CeBe</span><div class="wd-valor auto">{{ cebe|default:"—" }}</div></div>
             {% endwith %}
           {% endif %}
-          <div class="wd-campo"><span class="form-label">Tipo de Material</span><div class="wd-valor auto">{{ p.alta.tipo_material.codigo|default:"—" }}</div></div>
-          <div class="wd-campo"><span class="form-label">Almacén</span><div class="wd-valor auto">{{ p.alta.almacen.codigo|default:"—" }}</div></div>
           <div class="wd-campo"><span class="form-label">Código SAP</span><div class="wd-valor auto">{{ p.alta.codigo_sap|default:"—" }}</div></div>
         </div>
       </section>
 
-      {# Las imágenes (1 a 3 por partida) llegan en la fase 4 y se verán aquí. #}
-      <section class="wd-ficha mt-4">
-        <h2 class="h6 fw-bold mb-2">Imágenes</h2>
-        <div class="wd-imagenes">
-          {% for i in "123" %}<div class="wd-imagen-vacia">Imagen {{ i }}</div>{% endfor %}
-        </div>
-        <p class="text-secondary small mb-0 mt-2">Las imágenes se podrán subir y ver aquí a partir de la fase 4.</p>
-      </section>
     </div>
 
     <div class="col-12 col-xl-4">
@@ -91,6 +93,69 @@
   </div>
 </form>
 
+{# Fase 4. Fuera del formulario de arriba: subir archivos necesita su propio form multipart #}
+{# y HTML no permite un <form> dentro de otro. #}
+<div class="row g-4 mt-0">
+  <div class="col-12 col-xl-8">
+    <section class="wd-ficha" id="imagenes">
+      <h2 class="h6 fw-bold mb-2">Imágenes <small class="text-secondary fw-normal">({{ imagenes|length }} de 3; mínimo 1 para enviar)</small></h2>
+      <div class="wd-imagenes">
+        {% for img in imagenes %}
+          <figure class="wd-imagen">
+            <a href="{% url 'solicitudes:ver_imagen' img.pk %}" target="_blank" rel="noopener" title="Ver imagen {{ img.orden }}" data-visor>
+              <img src="{% url 'solicitudes:ver_imagen' img.pk %}" alt="Imagen {{ img.orden }} de la partida {{ p.numero }}">
+            </a>
+            <figcaption class="small text-secondary d-flex justify-content-between align-items-center">
+              <span>Imagen {{ img.orden }}</span>
+              {% if edita_imagenes %}
+                <form method="post" action="{% url 'solicitudes:quitar_imagen' img.pk %}" onsubmit="return confirm('¿Quitar la imagen {{ img.orden }}?');">
+                  {% csrf_token %}<button class="btn btn-link btn-sm p-0 text-danger">Quitar</button>
+                </form>
+              {% endif %}
+            </figcaption>
+          </figure>
+        {% empty %}
+          <div class="wd-imagen-vacia">Sin imágenes</div>
+        {% endfor %}
+      </div>
+      {% if edita_imagenes and lugares_libres > 0 %}
+        <form method="post" action="{% url 'solicitudes:subir_imagenes' p.pk %}" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center mt-3">
+          {% csrf_token %}
+          <input class="form-control form-control-sm w-auto" type="file" name="imagenes" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple required>
+          <button class="btn btn-outline-primary btn-sm">Subir</button>
+          <span class="text-secondary small">JPG, PNG o WebP, hasta 10 MB. Quedan {{ lugares_libres }} lugar(es). Se guardan como WebP de máximo 1920 px.</span>
+        </form>
+      {% elif not edita_imagenes %}
+        <p class="text-secondary small mb-0 mt-2">Las imágenes no se pueden cambiar en este estado o con tu rol.</p>
+      {% endif %}
+    </section>
+
+    {% if solicitud.flujo == "AMAT_ZRA" %}
+    <section class="wd-ficha mt-4">
+      <h2 class="h6 fw-bold mb-2">Coincidencias en el Catálogo SAP</h2>
+      {% if coincidencias %}
+        <div class="wd-tabla-caja">
+          <table class="table table-sm mb-0 align-middle">
+            <thead><tr><th>Tipo</th><th>Código</th><th>Descripción</th><th>No. Parte</th><th>UMB</th><th>Motivo</th></tr></thead>
+            <tbody>
+            {% for c in coincidencias %}
+              <tr class="{% if c.bloquea %}table-danger{% elif c.tipo == 'ADVERTENCIA' %}table-warning{% endif %}">
+                <td>{{ c.tipo }}</td><td>{{ c.codigo }}</td><td class="wd-libre">{{ c.descripcion }}</td>
+                <td>{{ c.no_parte|default:"—" }}</td><td>{{ c.umb|default:"—" }}</td><td class="small wd-libre">{{ c.motivo }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="text-secondary small mb-0 mt-2">Solo DUPLICADO (descripción y No. Parte exactos) impide enviar o aprobar.</p>
+      {% else %}
+        <p class="text-secondary small mb-0">Sin coincidencias por descripción ni por No. Parte.</p>
+      {% endif %}
+    </section>
+    {% endif %}
+  </div>
+</div>
+
 <h2 class="h6 fw-bold mt-4">Historia de la partida</h2>
 <div class="wd-tabla-caja">
   <table class="table table-sm mb-0 align-middle">
@@ -109,8 +174,23 @@
           {% if e.tipo == "CORRECCION_CODIGO_SAP" %}{{ e.detalle.antes }} → {{ e.detalle.despues }}{% endif %}
         </td>
       </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-secondary">Sin eventos: un borrador no deja historia hasta que se envía.</td></tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
+
+{# Visor de imágenes: un solo cuadro que el JavaScript llena con la imagen elegida. #}
+<div class="wd-visor" id="visor" hidden role="dialog" aria-modal="true" aria-label="Imagen ampliada">
+  <div class="wd-visor-caja">
+    <a class="wd-visor-boton wd-visor-descargar" href="#" download aria-label="Descargar imagen" title="Descargar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+    </a>
+    <button type="button" class="wd-visor-boton wd-visor-cerrar" aria-label="Cerrar" title="Cerrar">&times;</button>
+    <img alt="" title="Clic para abrir en tamaño completo en otra pestaña">
+    <div class="wd-lupa" aria-hidden="true"></div>
+  </div>
+</div>
 {% endblock %}
+{% block scripts %}{% if form %}<script src="{% static 'js/coincidencias.js' %}"></script>{% endif %}<script src="{% static 'js/ficha.js' %}"></script>{% endblock %}

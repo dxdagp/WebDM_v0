@@ -6,7 +6,27 @@ from django.contrib.auth.models import Group
 from catalogos.models import (
     Almacen, CategoriaValoracion, Centro, GrupoArticulos, GrupoCompras, TipoMaterial, UbicacionRefaccion, UMB,
 )
-from solicitudes.models import DetalleAlta, Evento, Flujo, Partida, Solicitud
+from io import BytesIO
+
+from django.core.files.base import ContentFile
+from PIL import Image
+
+from solicitudes.models import DetalleAlta, Evento, Flujo, ImagenPartida, Partida, Solicitud
+
+
+def imagen_png(ancho=40, alto=30, color=(200, 30, 30)):
+    """Bytes de un PNG pequeño, hecho en memoria con Pillow."""
+    salida = BytesIO()
+    Image.new("RGB", (ancho, alto), color).save(salida, format="PNG")
+    return salida.getvalue()
+
+
+def poner_imagen(partida, usuario, orden=1):
+    """Una imagen ya guardada (sin pasar por la conversión), para las pruebas que solo la necesitan presente."""
+    imagen = ImagenPartida(partida=partida, orden=orden, subida_por=usuario)
+    imagen.archivo.save(f"prueba-{partida.pk}-{orden}.png", ContentFile(imagen_png()), save=False)
+    imagen.save()
+    return imagen
 
 
 def crear_catalogos():
@@ -33,8 +53,8 @@ def crear_usuario(nombre, *roles, centros=()):
 
 
 def crear_enviada(c, solicitante, n=2, estado=Partida.Estado.EN_VALIDACION, centro=None, folio="AMAT_ZRA-2026-000001",
-                  **cambios):
-    """Una solicitud ya enviada con `n` partidas completas en `estado`."""
+                  con_imagen=True, **cambios):
+    """Una solicitud ya enviada con `n` partidas completas (con 1 imagen cada una) en `estado`."""
     centro = centro or c["mttu"]
     solicitud = Solicitud.objects.create(
         flujo=Flujo.AMAT_ZRA, solicitante=solicitante, folio=folio, estado=Solicitud.Estado.EN_PROCESO
@@ -49,6 +69,8 @@ def crear_enviada(c, solicitante, n=2, estado=Partida.Estado.EN_VALIDACION, cent
         )
         datos.update(cambios)
         DetalleAlta.objects.create(partida=partida, **datos)
+        if con_imagen:
+            poner_imagen(partida, solicitante)
         Evento.objects.create(solicitud=solicitud, partida=partida, usuario=solicitante, tipo=Evento.Tipo.ENVIO,
                               estado_anterior="BORRADOR", estado_nuevo=estado)
     return solicitud
