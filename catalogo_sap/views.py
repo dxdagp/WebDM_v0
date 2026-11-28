@@ -25,6 +25,38 @@ CATALOGOS = {
 }
 
 
+# Filtros de la consulta de materiales, uno por columna (pedido de Dave: todos menos Almacén y UMB).
+# (parámetro GET, búsqueda de Django sobre MaterialCentro, encabezado). El orden es el de la tabla,
+# igual que la captura AMAT_ZRA.
+COLUMNAS_MATERIALES = [
+    ("codigo", "material__codigo__startswith", "Código SAP"),
+    ("tipo", "material__tipo_material__icontains", "Tipo de material"),
+    ("centro", "centro_id", "Centro"),
+    ("descripcion", "material__descripcion__icontains", "Descripción"),
+    ("umb", None, "UMB"),
+    ("grupo_compras", "grupo_compras__icontains", "Grupo de compras"),
+    ("grupo_articulos", "material__grupo_articulos__icontains", "Grupo de artículos"),
+    ("categoria", "categoria_valoracion__icontains", "Categoría de valoración"),
+    ("ubicacion", "material__ubicacion__icontains", "Ubicación"),
+    ("no_parte", "material__no_parte_original__icontains", "No. Parte Original"),
+    ("tipo_unidad", "material__tipo_unidad__icontains", "Tipo de unidad"),
+    ("marca", "material__marca__icontains", "Marca"),
+    ("version", "material__version__icontains", "Versión"),
+    ("anio", "material__anio_modelo", "Año modelo"),
+    ("compatibilidad", "material__compatibilidad__icontains", "Compatibilidad"),
+    ("almacen", None, "Almacén"),
+    ("cebe", "cebe__icontains", "CeBe"),
+    ("origen", "material__origen", "Origen"),
+]
+
+
+def _sin_pagina(request):
+    """Los filtros actuales como texto de URL, para que la paginación no los pierda."""
+    filtros = request.GET.copy()
+    filtros.pop("pagina", None)
+    return filtros.urlencode()
+
+
 @login_required
 def consulta(request, catalogo="materiales"):
     """Catálogo de consulta global (Revisión 3: todos ven todos los Centros).
@@ -33,31 +65,48 @@ def consulta(request, catalogo="materiales"):
     tabla con la columna es_servicio; el código es único dentro de cada catálogo, no entre los dos.
     """
     datos_catalogo = CATALOGOS[catalogo]
-    texto = request.GET.get("q", "").strip()
-    centro = request.GET.get("centro", "")
+    contexto = {"catalogo": catalogo, "titulo": datos_catalogo["titulo"], "es_servicios": datos_catalogo["servicio"],
+                "puede_importar": puede_importar(request.user), "filtros_url": _sin_pagina(request)}
     if datos_catalogo["servicio"]:
-        # Servicios: un renglón por código (no dependen de un Centro).
+        # Servicios: un renglón por código (no dependen de un Centro) y una búsqueda general.
+        texto = request.GET.get("q", "").strip()
         renglones = MaterialSAP.objects.filter(es_servicio=True).select_related("creado_por", "importacion")
-        prefijo, orden = "", ["codigo"]
-    else:
-        # Materiales: un renglón por Material + Centro (pedido de Dave). La consulta parte de
-        # MaterialCentro y trae su material y su Centro con JOIN (select_related).
-        renglones = MaterialCentro.objects.filter(material__es_servicio=False).select_related(
-            "centro", "material__creado_por", "material__importacion")
-        prefijo, orden = "material__", ["material__codigo", "centro__codigo"]
-        if centro:
-            renglones = renglones.filter(centro_id=centro)
-    if texto:
-        # Q(...) | Q(...) = OR en el WHERE.
-        renglones = renglones.filter(
-            Q(**{f"{prefijo}codigo__startswith": texto}) | Q(**{f"{prefijo}descripcion__icontains": texto})
-            | Q(**{f"{prefijo}no_parte_original__icontains": texto})
-        )
-    pagina = Paginator(renglones.order_by(*orden), 50).get_page(request.GET.get("pagina"))
-    return render(request, "catalogo_sap/consulta.html", {
-        "pagina": pagina, "q": texto, "centro": centro, "catalogo": catalogo, "titulo": datos_catalogo["titulo"], "es_servicios": datos_catalogo["servicio"],
-        "centros": Centro.objects.order_by("codigo"),
-        "puede_importar": puede_importar(request.user),
+        if texto:
+            # Q(...) | Q(...) = OR en el WHERE.
+            renglones = renglones.filter(Q(codigo__startswith=texto) | Q(descripcion__icontains=texto))
+        contexto.update(q=texto, pagina=Paginator(renglones.order_by("codigo"), 50).get_page(request.GET.get("pagina")))
+        return render(request, "catalogo_sap/consulta.html", contexto)
+
+    # Materiales: un renglón por Material + Centro (pedido de Dave). La consulta parte de
+    # MaterialCentro y trae su material y su Centro con JOIN (select_related).
+    renglones = MaterialCentro.objects.filter(material__es_servicio=False).select_related(
+        "centro", "material__creado_por", "material__importacion")
+    columnas, hay_filtros = [], False
+    for nombre, busqueda, titulo in COLUMNAS_MATERIALES:
+        valor = request.GET.get(nombre, "").strip()
+        if busqueda and valor:
+            if nombre in ("centro", "anio") and not valor.isdigit():
+                valor = ""  # basura en la URL: se ignora en vez de tronar
+            else:
+                # Cada filtro con valor agrega un AND al WHERE.
+                renglones = renglones.filter(**{busqueda: valor})
+                hay_filtros = True
+        columnas.append({"nombre": nombre, "titulo": titulo, "filtra": bool(busqueda), "valor": valor})
+    contexto.update(
+        columnas=columnas, hay_filtros=hay_filtros, centros=Centro.objects.order_by("codigo"),
+        origenes=MaterialSAP.Origen.choices,
+        pagina=Paginator(renglones.order_by("material__codigo", "centro__codigo"), 50).get_page(request.GET.get("pagina")),
+    )
+    return render(request, "catalogo_sap/consulta.html", contexto)
+
+
+@login_required
+def material(request, pk):
+    """Todos los datos de un material: generales, por Centro, y las imágenes de su alta en WebDM."""
+    m = get_object_or_404(MaterialSAP.objects.select_related("creado_por", "importacion", "partida_origen__solicitud"), pk=pk)
+    imagenes = m.partida_origen.imagenes.order_by("orden") if m.partida_origen else []
+    return render(request, "catalogo_sap/material.html", {
+        "m": m, "centros": m.centros.select_related("centro").order_by("centro__codigo"), "imagenes": imagenes,
     })
 
 

@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
+from catalogo_sap.models import MaterialSAP
 from catalogos.models import Almacen, CategoriaValoracion, GrupoCompras
 
 from . import bandejas, duplicados, flujo, imagenes, servicios
@@ -587,7 +588,10 @@ def ver_imagen(request, pk):
     con la liga podría verlas. Aquí cada petición pasa por puede_ver.
     """
     imagen = get_object_or_404(ImagenPartida.objects.select_related("partida__solicitud"), pk=pk)
-    if not puede_ver(request.user, imagen.partida.solicitud):
+    # El catálogo es global (Revisión 3): las imágenes de un material YA dado de alta las ve
+    # cualquier usuario desde el catálogo. Las de partidas en trámite, solo quien ve la solicitud.
+    en_catalogo = MaterialSAP.objects.filter(partida_origen_id=imagen.partida_id).exists()
+    if not en_catalogo and not puede_ver(request.user, imagen.partida.solicitud):
         raise PermissionDenied("Esta imagen no es tuya ni de tus Centros.")
     try:
         archivo = imagen.archivo.open("rb")

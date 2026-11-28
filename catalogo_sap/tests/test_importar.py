@@ -198,7 +198,7 @@ class PantallasTests(TestCase):
         r = self.client.get(reverse("catalogo_sap:servicios"))
         self.assertContains(r, "555555")
         self.assertNotContains(r, "123456")
-        r = self.client.get(reverse("catalogo_sap:consulta"), {"q": "filt", "centro": self.c["meix"].pk})
+        r = self.client.get(reverse("catalogo_sap:consulta"), {"descripcion": "filt", "centro": self.c["meix"].pk})
         self.assertNotContains(r, "123456")  # existe solo en MTTU
 
     def test_materiales_un_renglon_por_material_y_centro(self):
@@ -235,3 +235,56 @@ class EjemplosTests(TestCase):
         self.assertEqual(sube("catalogo-materiales-otro-centro.txt", "MATERIALES"), (1, 2))
         m = MaterialSAP.objects.get(codigo="310001", es_servicio=False)
         self.assertEqual(sorted(m.centros.values_list("centro__codigo", flat=True)), ["MEIX", "MTTU"])
+
+
+class CatalogoCompletoTests(TestCase):
+    """Pedido de Dave: todas las columnas del alta, filtro por columna y ficha del material con imágenes."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from solicitudes import flujo
+        from solicitudes.models import Partida
+        from solicitudes.tests.datos import crear_enviada
+
+        cls.c = catalogos_para_importar()
+        cls.sol = crear_usuario("sol", "SOL_MAT", centros=[cls.c["mttu"]])
+        cls.dm = crear_usuario("dm", "DM", centros=[cls.c["mttu"]])
+        cls.otro = crear_usuario("otro", "SOL_MAT", centros=[cls.c["meix"]])  # no ve la solicitud
+        solicitud = crear_enviada(cls.c, cls.sol, n=1, estado=Partida.Estado.EN_DM)
+        cls.partida = solicitud.partidas.get()
+        flujo.terminar_con_codigos(cls.dm, {cls.partida.pk: "100001"})
+        importar(txt("200002\tBALATA\tMEIX\tZRA\tPZA\tBD-7\t"), "m.txt", cls.dm)
+
+    def test_alta_en_webdm_llena_todas_las_columnas(self):
+        m = MaterialSAP.objects.get(codigo="100001")
+        self.assertEqual((m.ubicacion, m.tipo_unidad, m.marca, m.version, m.anio_modelo, m.partida_origen),
+                         ("MOTOR", "TRACTO", "MARCA", "V1", 2024, self.partida))
+        self.assertEqual(m.centros.get().almacen, "RC01")
+
+    def test_filtros_por_columna(self):
+        self.client.force_login(self.otro)
+        url = reverse("catalogo_sap:consulta")
+        def codigos(**f):
+            return [mc.material.codigo for mc in self.client.get(url, f).context["pagina"]]
+        self.assertEqual(codigos(), ["100001", "200002"])
+        self.assertEqual(codigos(marca="marc"), ["100001"])
+        self.assertEqual(codigos(anio="2024"), ["100001"])
+        self.assertEqual(codigos(no_parte="bd"), ["200002"])
+        self.assertEqual(codigos(origen="IMPORT", centro=str(self.c["meix"].pk)), ["200002"])
+        self.assertEqual(codigos(anio="abc"), ["100001", "200002"])  # basura: se ignora
+        r = self.client.get(url)
+        self.assertNotContains(r, 'name="almacen"')  # Almacén y UMB no se filtran
+        self.assertNotContains(r, 'name="umb"')
+
+    def test_ficha_del_material_con_imagenes_para_cualquier_usuario(self):
+        m = MaterialSAP.objects.get(codigo="100001")
+        self.client.force_login(self.otro)
+        r = self.client.get(reverse("catalogo_sap:consulta"))
+        self.assertContains(r, reverse("catalogo_sap:material", args=[m.pk]))
+        r = self.client.get(reverse("catalogo_sap:material", args=[m.pk]))
+        self.assertContains(r, "TRACTO")
+        imagen = r.context["imagenes"][0]
+        # El catálogo es global: ya dado de alta, su imagen la ve también quien no ve la solicitud.
+        self.assertEqual(self.client.get(reverse("solicitudes:ver_imagen", args=[imagen.pk])).status_code, 200)
+        r = self.client.get(reverse("catalogo_sap:material", args=[MaterialSAP.objects.get(codigo="200002").pk]))
+        self.assertContains(r, "Sin imágenes")

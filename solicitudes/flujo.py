@@ -277,12 +277,17 @@ def terminar_con_codigos(usuario, codigos):
                 tipo_material=alta.tipo_material.codigo if alta.tipo_material else "",
                 umb=alta.umb.codigo if alta.umb else "", no_parte_original=alta.no_parte_original,
                 grupo_articulos=alta.grupo_articulos.codigo if alta.grupo_articulos else "",
-                origen=MaterialSAP.Origen.WEBDM, folio_origen=p.solicitud.folio or "", creado_por=usuario,
+                ubicacion=alta.ubicacion.codigo if alta.ubicacion else "", tipo_unidad=alta.tipo_unidad,
+                marca=alta.marca, version=alta.version, anio_modelo=alta.anio_modelo,
+                compatibilidad=alta.compatibilidad,
+                origen=MaterialSAP.Origen.WEBDM, folio_origen=p.solicitud.folio or "", partida_origen=p,
+                creado_por=usuario,
             )
             MaterialCentro.objects.create(
                 material=material, centro=p.centro, cebe=p.centro.centro_beneficio if p.centro else "",
                 grupo_compras=alta.grupo_compras.codigo if alta.grupo_compras else "",
                 categoria_valoracion=alta.categoria_valoracion.codigo if alta.categoria_valoracion else "",
+                almacen=alta.almacen.codigo if alta.almacen else "",
             )
             anterior = p.estado
             p.estado = E.TERMINADA

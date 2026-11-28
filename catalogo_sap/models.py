@@ -31,9 +31,20 @@ class MaterialSAP(models.Model):
     umb = models.CharField("UMB", max_length=10, blank=True)
     no_parte_original = models.CharField("No. Parte Original", max_length=40, blank=True)
     grupo_articulos = models.CharField("grupo de artículos", max_length=20, blank=True)
+    # Resto de los datos del alta AMAT_ZRA (pedido de Dave): el catálogo muestra TODAS las columnas.
+    # El TXT de SAP no los trae, así que en lo importado quedan vacíos; el alta en WebDM los llena.
+    ubicacion = models.CharField("ubicación de la refacción", max_length=20, blank=True)
+    tipo_unidad = models.CharField("tipo de unidad", max_length=40, blank=True)
+    marca = models.CharField("marca de la unidad", max_length=40, blank=True)
+    version = models.CharField("versión de la unidad", max_length=40, blank=True)
+    anio_modelo = models.PositiveSmallIntegerField("año modelo", null=True, blank=True)
+    compatibilidad = models.CharField("compatibilidad entre unidades", max_length=40, blank=True)
     es_servicio = models.BooleanField(default=False)
     origen = models.CharField(max_length=10, choices=Origen.choices)
     folio_origen = models.CharField("folio de origen", max_length=30, blank=True, help_text="Solo para origen WEBDM.")
+    # La partida que dio de alta el material (origen WEBDM): de ahí salen sus imágenes.
+    partida_origen = models.OneToOneField("solicitudes.Partida", on_delete=models.SET_NULL, null=True, blank=True,
+                                          related_name="material_catalogo")
     importacion = models.ForeignKey("Importacion", on_delete=models.PROTECT, null=True, blank=True)
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     creado = models.DateTimeField(auto_now_add=True)
@@ -64,6 +75,7 @@ class MaterialCentro(models.Model):
     grupo_compras = models.CharField("grupo de compras", max_length=20, blank=True)
     categoria_valoracion = models.CharField("categoría de valoración", max_length=20, blank=True)
     cebe = models.CharField("Centro de Beneficio (CeBe)", max_length=20, blank=True)
+    almacen = models.CharField("almacén", max_length=20, blank=True)
     agregado = models.DateTimeField(auto_now_add=True)
 
     class Meta:

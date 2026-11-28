@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}{{ m.codigo }} · Catálogo de materiales · WebDM{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+  <div>
+    <div class="text-secondary small"><a href="{% url 'catalogo_sap:consulta' %}">Catálogo de materiales</a> / {{ m.codigo }}</div>
+    <h1 class="h4 fw-bold mb-0">{{ m.codigo }} · {{ m.descripcion }}</h1>
+  </div>
+  <div class="small">{% include "catalogo_sap/_origen.html" %}</div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-xl-7">
+    <section class="wd-ficha">
+      <h2 class="h6 fw-bold mb-2">Datos del material</h2>
+      <dl class="row mb-0 small">
+        <dt class="col-5">Código SAP</dt><dd class="col-7">{{ m.codigo }}</dd>
+        <dt class="col-5">Tipo de material</dt><dd class="col-7">{{ m.tipo_material|default:"—" }}</dd>
+        <dt class="col-5">Descripción</dt><dd class="col-7">{{ m.descripcion }}</dd>
+        <dt class="col-5">UMB</dt><dd class="col-7">{{ m.umb|default:"—" }}</dd>
+        <dt class="col-5">Grupo de artículos</dt><dd class="col-7">{{ m.grupo_articulos|default:"—" }}</dd>
+        <dt class="col-5">Ubicación de la refacción</dt><dd class="col-7">{{ m.ubicacion|default:"—" }}</dd>
+        <dt class="col-5">No. Parte Original</dt><dd class="col-7">{{ m.no_parte_original|default:"—" }}</dd>
+        <dt class="col-5">Tipo de unidad</dt><dd class="col-7">{{ m.tipo_unidad|default:"—" }}</dd>
+        <dt class="col-5">Marca de la unidad</dt><dd class="col-7">{{ m.marca|default:"—" }}</dd>
+        <dt class="col-5">Versión</dt><dd class="col-7">{{ m.version|default:"—" }}</dd>
+        <dt class="col-5">Año modelo</dt><dd class="col-7">{{ m.anio_modelo|default:"—" }}</dd>
+        <dt class="col-5">Compatibilidad</dt><dd class="col-7">{{ m.compatibilidad|default:"—" }}</dd>
+        {% if m.partida_origen %}<dt class="col-5">Solicitud de origen</dt><dd class="col-7"><a href="{% url 'solicitudes:partida' m.partida_origen.pk %}">{{ m.folio_origen }} · partida {{ m.partida_origen.numero }}</a></dd>{% endif %}
+      </dl>
+    </section>
+  </div>
+  <div class="col-12 col-xl-5">
+    <section class="wd-ficha">
+      <h2 class="h6 fw-bold mb-2">Imágenes</h2>
+      {% if imagenes %}
+      <div class="wd-imagenes">
+        {% for img in imagenes %}
+          <figure class="wd-imagen">
+            <a href="{% url 'solicitudes:ver_imagen' img.pk %}" target="_blank" rel="noopener" title="Ver imagen {{ img.orden }}" data-visor>
+              <img src="{% url 'solicitudes:ver_imagen' img.pk %}" alt="Imagen {{ img.orden }} del material {{ m.codigo }}">
+            </a>
+            <figcaption class="small text-secondary">Imagen {{ img.orden }}</figcaption>
+          </figure>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="small text-secondary mb-0">Sin imágenes. Los materiales importados del TXT de SAP no traen imágenes; las tienen los que se dieron de alta en WebDM.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+
+<section class="wd-ficha mt-4">
+  <h2 class="h6 fw-bold mb-2">Por Centro</h2>
+  <div class="wd-tabla-caja">
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Centro</th><th>Grupo de compras</th><th>Categoría de valoración</th><th>Almacén</th><th>CeBe</th><th>Agregado</th></tr></thead>
+      <tbody>
+      {% for mc in centros %}
+        <tr><td>{{ mc.centro.codigo }}</td><td>{{ mc.grupo_compras|default:"—" }}</td><td>{{ mc.categoria_valoracion|default:"—" }}</td>
+            <td>{{ mc.almacen|default:"—" }}</td><td>{{ mc.cebe|default:"—" }}</td><td>{{ mc.agregado|date:"d/m/Y" }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% include "solicitudes/_visor.html" %}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/ficha.js' %}"></script>{% endblock %}

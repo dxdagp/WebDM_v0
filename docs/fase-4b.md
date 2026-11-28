@@ -170,15 +170,26 @@ Todo va en una transacción (`@transaction.atomic`). Si alguien da de alta el mi
 
 La búsqueda acepta código (empieza con), descripción o No. Parte (contiene), más un filtro por Centro. Son 50 por página.
 
-**Materiales: un renglón por Material + Centro** (pedido de Dave). Si el 310001 está en MTTU y MEIX, salen dos renglones, cada uno con su grupo de compras, categoría y CeBe. Por eso la consulta parte de `MaterialCentro`, no de `MaterialSAP`:
+**Materiales: un renglón por Material + Centro, con todas las columnas del alta AMAT_ZRA** (pedido de Dave), en el mismo orden que la captura: Código SAP, Tipo de material, Centro, Descripción, UMB, Grupo de compras, Grupo de artículos, Categoría de valoración, Ubicación, No. Parte Original, Tipo de unidad, Marca, Versión, Año modelo, Compatibilidad, Almacén, CeBe y Origen.
 
-```python
-MaterialCentro.objects.filter(material__es_servicio=False) \
-    .select_related("centro", "material__creado_por", "material__importacion") \
-    .order_by("material__codigo", "centro__codigo")
-```
+- Lo **importado** solo trae lo que tiene el layout del TXT; las demás columnas salen con "—".
+- Lo **dado de alta en WebDM** las llena todas: al terminar con código, DM copia los datos de la partida al catálogo (`flujo.terminar_con_codigos`) y guarda `partida_origen`, de donde salen las imágenes.
+- La migración `0006_llenar_materiales_webdm` llena estas columnas en los materiales que ya se habían dado de alta antes del cambio.
 
-`select_related` convierte cada relación en un `JOIN`, así que la página completa es **una** consulta (más el `COUNT` del paginador):
+**Filtros:** bajo cada encabezado hay un cuadro de filtro (todos menos Almacén y UMB). Escribes y presionas Enter. La lista `COLUMNAS_MATERIALES` de `views.py` dice qué búsqueda usa cada columna:
+
+| Columna | Búsqueda | SQL |
+| --- | --- | --- |
+| Código SAP | `material__codigo__startswith` | `codigo LIKE '3100%'` |
+| Centro, Origen | igual (lista) | `centro_id = 1` |
+| Año modelo | igual | `anio_modelo = 2024` |
+| Las demás | `__icontains` | `UPPER(marca) LIKE UPPER('%marc%')` |
+
+Cada filtro con valor agrega un `AND` al `WHERE`. La paginación conserva los filtros (`filtros_url`).
+
+**Ficha del material:** clic en el código abre `/catalogo-sap/material/<id>/` con todos sus datos, una tabla por Centro (grupo de compras, categoría, almacén, CeBe) y sus imágenes, con el mismo visor de la ficha de partida (lupa, descarga, abrir en otra pestaña). El catálogo es global, así que las imágenes de un material **ya dado de alta** las ve cualquier usuario; las de partidas en trámite siguen siendo solo para quien ve la solicitud.
+
+La consulta parte de `MaterialCentro` y trae su material y su Centro con `JOIN` (`select_related`), así que la página es **una** consulta (más el `COUNT` del paginador):
 
 ```sql
 SELECT "catalogo_sap_materialcentro".*, "catalogo_sap_materialsap".*, "catalogos_centro".*, ...
@@ -188,11 +199,23 @@ INNER JOIN "catalogo_sap_materialsap" ON ("catalogo_sap_materialcentro"."materia
 LEFT OUTER JOIN "catalogo_sap_importacion" ON (...)
 INNER JOIN "usuarios_usuario" ON (...)
 WHERE NOT "catalogo_sap_materialsap"."es_servicio"
+  AND UPPER("catalogo_sap_materialsap"."marca"::text) LIKE UPPER('%marc%')
 ORDER BY "catalogo_sap_materialsap"."codigo" ASC, "catalogos_centro"."codigo" ASC
 LIMIT 50;
 ```
 
-El filtro por Centro agrega `AND "catalogo_sap_materialcentro"."centro_id" = 1`. Los **servicios** siguen con un renglón por código, porque no tienen Centro.
+Los **servicios** siguen con un renglón por código y una búsqueda general, porque no tienen Centro.
+
+**Columnas nuevas (migración 0005):**
+
+```sql
+ALTER TABLE "catalogo_sap_materialsap" ADD COLUMN "ubicacion" varchar(20) DEFAULT '' NOT NULL;
+ALTER TABLE "catalogo_sap_materialsap" ADD COLUMN "anio_modelo" smallint NULL CHECK ("anio_modelo" >= 0);
+-- …tipo_unidad, marca, version, compatibilidad igual que ubicacion
+ALTER TABLE "catalogo_sap_materialsap" ADD COLUMN "partida_origen_id" bigint NULL UNIQUE
+    REFERENCES "solicitudes_partida"("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "catalogo_sap_materialcentro" ADD COLUMN "almacen" varchar(20) DEFAULT '' NOT NULL;
+```
 
 ## 5. Ejercicios en `psql`
 
@@ -233,8 +256,9 @@ GROUP BY mensaje ORDER BY 2 DESC;
 - Permisos.
 - La consulta separa materiales y servicios.
 - Materiales: un renglón por Material + Centro.
+- El alta en WebDM llena todas las columnas; filtros por columna (sin Almacén ni UMB); ficha del material con imágenes visible para cualquier usuario.
 
-En total pasan 124 pruebas.
+En total pasan 127 pruebas.
 
 ## 7. Pendiente para la fase 5
 

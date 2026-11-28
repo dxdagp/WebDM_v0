@@ -109,3 +109,8 @@ td.wd-error { background: #FFEBE9; }
 .wd-lupa { display: none; position: absolute; width: 220px; height: 220px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 16px rgba(0,0,0,.45); background-repeat: no-repeat; pointer-events: none; }
 .wd-celda-imagenes input[type=file] { width: 190px; }
 .wd-celda-imagenes a { display: block; padding: 0 5px; }
+
+/* Fase 4b: catálogo de materiales con todas las columnas y un filtro bajo cada una. */
+.wd-catalogo th, .wd-catalogo td { white-space: nowrap; }
+.wd-catalogo .wd-filtros th { padding: 2px; background: #FAFAFA; }
+.wd-catalogo .wd-filtros .form-control, .wd-catalogo .wd-filtros .form-select { min-width: 70px; padding: 1px 4px; font-size: 12px; border-radius: 0; }
