@@ -214,8 +214,8 @@ class DetalleServicio(models.Model):
     partida = models.OneToOneField(Partida, on_delete=models.CASCADE, primary_key=True, related_name="servicio")
     descripcion = models.CharField("descripción", max_length=40, blank=True)
     # Pedido de Dave: el tipo de servicio (ZRA o ZSA) se captura y de él depende la UMB que se propone.
-    tipo_material = models.ForeignKey(
-        "catalogos.TipoMaterial", on_delete=models.PROTECT, null=True, blank=True, verbose_name="tipo de servicio"
+    tipo_servicio = models.ForeignKey(
+        "catalogos.TipoServicio", on_delete=models.PROTECT, null=True, blank=True, verbose_name="tipo de servicio"
     )
     umb = models.ForeignKey("catalogos.UMB", on_delete=models.PROTECT, null=True, blank=True, verbose_name="UMB")
     grupo_articulos = models.ForeignKey("catalogos.GrupoArticulos", on_delete=models.PROTECT, null=True, blank=True)

@@ -1,7 +1,7 @@
 /*
  * Tabla tipo Excel de ASER_ZSA (alta de servicios): Tipo de servicio | Descripción | UMB | Grupo de artículos.
  *
- *   1. Agregar y quitar renglones; cada renglón nuevo trae el tipo ZSA y su UMB. Al cambiar el tipo,
+ *   1. Agregar y quitar renglones; si hay un solo tipo de servicio, cada renglón nuevo ya lo trae con su UMB. Al cambiar el tipo,
  *      se propone la UMB predeterminada del tipo nuevo (si la UMB estaba vacía o era la del tipo anterior).
  *   2. Pegado de bloques desde Excel, empezando en la columna donde se pega. En las listas
  *      (UMB, Grupo de artículos) se acepta el código ("SER") o el texto completo de la opción.
@@ -17,7 +17,7 @@
   var plantilla = document.getElementById("fila-vacia");
   var total = form.querySelector('input[name$="-TOTAL_FORMS"]');
   var datos = JSON.parse(document.getElementById("datos-automaticos").textContent);
-  var COLUMNAS = ["tipo_material", "descripcion", "umb", "grupo_articulos"];
+  var COLUMNAS = ["tipo_servicio", "descripcion", "umb", "grupo_articulos"];
 
   function filas() { return Array.prototype.slice.call(cuerpo.querySelectorAll("tr.wd-fila")); }
   function campo(fila, nombre) { return fila.querySelector('[name$="-' + nombre + '"]'); }
@@ -34,13 +34,13 @@
     total.value = indice + 1;
     var fila = filas()[filas().length - 1];
     campo(fila, "numero").value = siguienteNumero();
-    if (datos.tipo) { campo(fila, "tipo_material").value = datos.tipo; proponerUmb(fila, ""); }
+    if (datos.tipo) { campo(fila, "tipo_servicio").value = datos.tipo; proponerUmb(fila, ""); }
     return fila;
   }
   // UMB según el tipo: se cambia solo si estaba vacía o era la propuesta del tipo anterior (no pisa lo que eligió el usuario).
   function proponerUmb(fila, tipoAnterior) {
     var umb = campo(fila, "umb");
-    var nueva = datos.umbPorTipo[campo(fila, "tipo_material").value];
+    var nueva = datos.umbPorTipo[campo(fila, "tipo_servicio").value];
     if (nueva && (!umb.value || umb.value === datos.umbPorTipo[tipoAnterior])) umb.value = nueva;
   }
   function quitarFila(fila) {
@@ -72,7 +72,7 @@
     renglones.forEach(function (renglon, i) {
       var destino = visibles[inicio + i] || agregarFila();
       if (!destino) return;
-      var tipoAntes = campo(destino, "tipo_material").value;
+      var tipoAntes = campo(destino, "tipo_servicio").value;
       renglon.split("\t").forEach(function (valor, j) {
         var nombre = COLUMNAS[inicial + j];
         if (!nombre) return;
@@ -93,11 +93,11 @@
   // El tipo que tenía cada lista antes del cambio (para saber si la UMB era la propuesta).
   var tipoPrevio = new WeakMap();
   cuerpo.addEventListener("focusin", function (e) {
-    if ((e.target.name || "").slice(-14) === "-tipo_material") tipoPrevio.set(e.target, e.target.value);
+    if ((e.target.name || "").slice(-14) === "-tipo_servicio") tipoPrevio.set(e.target, e.target.value);
   });
   cuerpo.addEventListener("change", function (e) {
     hayCambios = true;
-    if ((e.target.name || "").slice(-14) === "-tipo_material") {
+    if ((e.target.name || "").slice(-14) === "-tipo_servicio") {
       proponerUmb(e.target.closest("tr.wd-fila"), tipoPrevio.get(e.target) || "");
       tipoPrevio.set(e.target, e.target.value);
     }

@@ -4,8 +4,8 @@ Lo que definió Dave (28-nov-2026):
 
     Captura:  Partida | Tipo de servicio | Descripción | UMB | Grupo de artículos | Estado
               Sin Centro (los servicios no tienen) y sin imágenes.
-              El tipo de servicio (ZRA o ZSA) viene del catálogo de tipos de material, y de él depende la
-              UMB que se propone: la predeterminada de ese tipo (ADMIN la define en Tipos de material).
+              El tipo de servicio viene de su propio catálogo (Tipos de servicio, en ADMIN), y de él depende
+              la UMB que se propone: la predeterminada de ese tipo. En SAP el tipo de material es siempre ZSA.
 
     Reglas, iguales que las del alta de materiales: descripción en MAYÚSCULAS y sin acentos (la Ñ se
     queda), máximo 40; UMB y grupo de artículos contra sus catálogos; duplicados contra el catálogo
@@ -21,7 +21,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from catalogo_sap.models import MaterialSAP
-from catalogos.models import GrupoArticulos, TipoMaterial, UMB  # noqa: F401
+from catalogos.models import GrupoArticulos, TipoServicio, UMB  # noqa: F401
 
 from . import duplicados
 from .folios import siguiente_folio
@@ -30,10 +30,10 @@ from .models import DetalleServicio, Evento, Flujo, Partida, Solicitud
 from .rapido import FormsetCompartido, compartir_catalogos
 
 E = Partida.Estado
-TIPO_PROPUESTO = "ZSA"  # el tipo con el que nacen los renglones nuevos; se puede cambiar por ZRA
+TIPO = "ZSA"  # tipo de material en SAP de todo servicio
 NOMBRE_TXT = "Alta_Ser.txt"
-CAMPOS = ["tipo_material", "descripcion", "umb", "grupo_articulos"]
-NOMBRES = {"tipo_material": "Tipo de servicio", "descripcion": "Descripción", "umb": "UMB", "grupo_articulos": "Grupo de artículos"}
+CAMPOS = ["tipo_servicio", "descripcion", "umb", "grupo_articulos"]
+NOMBRES = {"tipo_servicio": "Tipo de servicio", "descripcion": "Descripción", "umb": "UMB", "grupo_articulos": "Grupo de artículos"}
 
 
 def umb_de(tipo):
@@ -44,16 +44,18 @@ def umb_de(tipo):
 
 def umbs_por_tipo():
     """{id de tipo: id de UMB predeterminada}: lo que usa la pantalla para proponer al cambiar el tipo."""
-    return {str(t.pk): str(t.umb_predeterminada_id) for t in TipoMaterial.objects.filter(activo=True, umb_predeterminada__activo=True)}
+    return {str(t.pk): str(t.umb_predeterminada_id) for t in TipoServicio.objects.filter(activo=True, umb_predeterminada__activo=True)}
 
 
 def tipo_propuesto():
-    return TipoMaterial.objects.filter(codigo=TIPO_PROPUESTO, activo=True).select_related("umb_predeterminada").first()
+    """Si solo hay un tipo de servicio activo, los renglones nuevos ya lo traen; si hay varios, se elige."""
+    tipos = list(TipoServicio.objects.filter(activo=True).select_related("umb_predeterminada")[:2])
+    return tipos[0] if len(tipos) == 1 else None
 
 
 class ServicioForm(forms.Form):
     numero = forms.IntegerField(min_value=1, required=False, label="Partida")
-    tipo_material = Catalogo(TipoMaterial.objects.select_related("umb_predeterminada"), label="Tipo de servicio")
+    tipo_servicio = Catalogo(TipoServicio.objects.select_related("umb_predeterminada"), label="Tipo de servicio")
     descripcion = CampoTextoSAP(label="Descripción")
     umb = Catalogo(UMB.objects.all(), label="UMB")
     grupo_articulos = Catalogo(GrupoArticulos.objects.all(), label="Grupo de artículos")
@@ -79,7 +81,7 @@ class ServicioForm(forms.Form):
     def faltantes(self):
         """Obligatorios vacíos. La UMB vacía no falta si su tipo tiene predeterminada: se guarda esa."""
         vacios = [c for c in CAMPOS if self.cleaned_data.get(c) in (None, "")]
-        if "umb" in vacios and umb_de(self.cleaned_data.get("tipo_material")) is not None:
+        if "umb" in vacios and umb_de(self.cleaned_data.get("tipo_servicio")) is not None:
             vacios.remove("umb")
         return vacios
 
@@ -161,25 +163,25 @@ ServicioCorreccionFormSet = forms.formset_factory(
 
 def filas_iniciales(solicitud):
     return [
-        {"numero": p.numero, "tipo_material": p.servicio.tipo_material_id, "descripcion": p.servicio.descripcion,
+        {"numero": p.numero, "tipo_servicio": p.servicio.tipo_servicio_id, "descripcion": p.servicio.descripcion,
          "umb": p.servicio.umb_id, "grupo_articulos": p.servicio.grupo_articulos_id}
         for p in solicitud.partidas.select_related("servicio").order_by("numero")
     ]
 
 
 def filas_nuevas(cuantas=5):
-    """Renglones vacíos (10 a 50) con el tipo ZSA y su UMB ya propuestos."""
+    """Renglones vacíos (10 a 50); si hay un solo tipo de servicio, ya traen ese tipo y su UMB."""
     tipo = tipo_propuesto()
     umb = umb_de(tipo)
-    return [{"numero": n, "tipo_material": tipo.pk if tipo else None, "umb": umb.pk if umb else None}
+    return [{"numero": n, "tipo_servicio": tipo.pk if tipo else None, "umb": umb.pk if umb else None}
             for n in range(10, 10 * cuantas + 10, 10)]
 
 
 def _guardar_detalle(partida, datos):
     detalle = getattr(partida, "servicio", None) or DetalleServicio(partida=partida)
-    detalle.tipo_material = datos.get("tipo_material")
+    detalle.tipo_servicio = datos.get("tipo_servicio")
     detalle.descripcion = datos.get("descripcion") or ""
-    detalle.umb = datos.get("umb") or umb_de(detalle.tipo_material)  # vacía = la predeterminada de su tipo
+    detalle.umb = datos.get("umb") or umb_de(detalle.tipo_servicio)  # vacía = la predeterminada de su tipo
     detalle.grupo_articulos = datos.get("grupo_articulos")
     detalle.save()
 
@@ -221,7 +223,7 @@ def enviar(usuario, formset, solicitud):
 def faltantes(partida):
     """Para Aprobar y Reenviar (flujo.aplicar). Los duplicados los revisa flujo.duplicado_de()."""
     d = partida.servicio
-    valores = {"tipo_material": d.tipo_material_id, "descripcion": d.descripcion, "umb": d.umb_id, "grupo_articulos": d.grupo_articulos_id}
+    valores = {"tipo_servicio": d.tipo_servicio_id, "descripcion": d.descripcion, "umb": d.umb_id, "grupo_articulos": d.grupo_articulos_id}
     return [NOMBRES[c] for c in CAMPOS if valores[c] in (None, "")]
 
 
@@ -238,7 +240,7 @@ def guardar_correcciones(usuario, forms_, solicitud):
         d = partida.servicio
         for campo in CAMPOS:
             actual = getattr(d, campo)
-            nuevo = form.cleaned_data.get(campo) or (umb_de(form.cleaned_data.get("tipo_material")) if campo == "umb" else None)
+            nuevo = form.cleaned_data.get(campo) or (umb_de(form.cleaned_data.get("tipo_servicio")) if campo == "umb" else None)
             if actual == nuevo or (actual in (None, "") and nuevo in (None, "")):
                 continue
             Evento.objects.create(
@@ -283,7 +285,7 @@ def terminar(usuario, partida, codigo):
     d.codigo_sap = codigo
     d.save(update_fields=["codigo_sap"])
     MaterialSAP.objects.create(
-        codigo=codigo, descripcion=d.descripcion, tipo_material=d.tipo_material.codigo if d.tipo_material else "", umb=d.umb.codigo if d.umb else "",
+        codigo=codigo, descripcion=d.descripcion, tipo_material=TIPO, umb=d.umb.codigo if d.umb else "",
         grupo_articulos=d.grupo_articulos.codigo if d.grupo_articulos else "", es_servicio=True,
         origen=MaterialSAP.Origen.WEBDM, folio_origen=partida.solicitud.folio or "", partida_origen=partida,
         creado_por=usuario,

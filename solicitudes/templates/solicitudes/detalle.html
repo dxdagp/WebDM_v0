@@ -33,7 +33,7 @@
     <thead><tr><th>Partida</th><th>Tipo</th><th>Descripción</th><th>UMB</th><th>Grupo de artículos</th><th>Código SAP</th><th>Estado</th></tr></thead>
     <tbody>
     {% for p in solicitud.partidas.all %}{% with s=p.servicio %}
-      <tr id="partida-{{ p.numero }}"><td>{{ p.numero }}</td><td>{{ s.tipo_material.codigo|default:"—" }}</td><td>{{ s.descripcion|default:"—" }}</td><td>{{ s.umb.codigo|default:"—" }}</td>
+      <tr id="partida-{{ p.numero }}"><td>{{ p.numero }}</td><td>{{ s.tipo_servicio.codigo|default:"—" }}</td><td>{{ s.descripcion|default:"—" }}</td><td>{{ s.umb.codigo|default:"—" }}</td>
           <td>{{ s.grupo_articulos.codigo|default:"—" }}</td><td>{{ s.codigo_sap|default:"—" }}</td><td><span class="wd-estado">{{ p.estado }}</span></td></tr>
     {% endwith %}{% endfor %}
     </tbody>

@@ -32,7 +32,7 @@
     </div>
   </div>
 
-  {% if sin_umb %}<div class="alert alert-warning">Ningún tipo de servicio tiene UMB predeterminada: elige la UMB en cada renglón, o pide a ADMIN que la defina en Tipos de material.</div>{% endif %}
+  {% if sin_umb %}<div class="alert alert-warning">Ningún tipo de servicio tiene UMB predeterminada: elige la UMB en cada renglón, o pide a ADMIN que la defina en Tipos de servicio.</div>{% endif %}
   {% for e in formset.non_form_errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
 
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">

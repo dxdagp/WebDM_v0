@@ -50,7 +50,7 @@ def con_datos_de_tabla(queryset):
     return (
         queryset.select_related("solicitud__solicitante", "centro", "alta__grupo_articulos", "alta__umb",
                                  "ampliacion__material", "ampliacion__centro_origen",
-                                 "modificacion__material", "servicio__umb", "servicio__tipo_material", "servicio__grupo_articulos")
+                                 "modificacion__material", "servicio__umb", "servicio__tipo_servicio", "servicio__grupo_articulos")
         # Subquery = un SELECT dentro del SELECT: para cada partida trae el motivo de su devolución más reciente.
         .annotate(ultimo_motivo=Subquery(ultimo_motivo))
         .order_by("actualizada")

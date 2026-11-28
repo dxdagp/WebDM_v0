@@ -14,7 +14,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from catalogos.models import (
-    Almacen, CategoriaValoracion, Centro, GrupoArticulos, GrupoCompras, Planificador, TipoMaterial,
+    Almacen, CategoriaValoracion, Centro, GrupoArticulos, GrupoCompras, Planificador, TipoMaterial, TipoServicio,
     UbicacionRefaccion, UMB,
 )
 
@@ -50,6 +50,10 @@ class Command(BaseCommand):
         CategoriaValoracion.objects.get_or_create(codigo="CV01", defaults={"descripcion": "Refacción nueva", "tipo_material": zra})
         # ZSA: solo para el catálogo de servicios importado (fase 4b).
         TipoMaterial.objects.get_or_create(codigo="ZSA", defaults={"descripcion": "Servicios"})
+        # Tipos de servicio de EJEMPLO, con su UMB predeterminada. Los reales los da de alta ADMIN.
+        for codigo, descripcion, umb in [("MO", "Mano de obra", "H"), ("SE", "Servicio externo", "SER")]:
+            TipoServicio.objects.get_or_create(
+                codigo=codigo, defaults={"descripcion": descripcion, "umb_predeterminada": UMB.objects.get(codigo=umb)})
 
         Usuario = get_user_model()
         for username, roles in [("solicitante", ["SOL_MAT"]), ("validador", ["SOL_MAT", "VAL_MAT"]), ("dm", ["DM"])]:

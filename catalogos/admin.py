@@ -37,8 +37,11 @@ class CatalogoAdmin(admin.ModelAdmin):
     search_fields = ("codigo", "descripcion")
 
 
-@admin.register(models.TipoMaterial)
-class TipoMaterialAdmin(CatalogoAdmin):
+admin.site.register(models.TipoMaterial, CatalogoAdmin)
+
+
+@admin.register(models.TipoServicio)
+class TipoServicioAdmin(CatalogoAdmin):
     list_display = ("codigo", "descripcion", "umb_predeterminada", "activo")
 
 
