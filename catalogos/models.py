@@ -62,6 +62,12 @@ class GrupoArticulos(Catalogo):
 
 
 class TipoMaterial(Catalogo):
+    # Pedido de Dave (28-nov-2026): al crear un servicio se propone la UMB predeterminada de su tipo (ZSA).
+    umb_predeterminada = models.ForeignKey(
+        UMB, on_delete=models.PROTECT, null=True, blank=True, verbose_name="UMB predeterminada",
+        help_text="Se propone al crear servicios de este tipo.",
+    )
+
     class Meta(Catalogo.Meta):
         verbose_name = "tipo de material"
         verbose_name_plural = "tipos de material"

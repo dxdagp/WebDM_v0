@@ -76,6 +76,10 @@ def faltantes(partida):
         from .ampliacion import faltantes as faltantes_ampl
 
         return faltantes_ampl(partida)
+    if partida.solicitud.flujo == "ASER_ZSA":
+        from .alta_servicio import faltantes as faltantes_aser
+
+        return faltantes_aser(partida)
     if partida.solicitud.flujo in ("MOD_ZRA", "MOD_ZSA"):
         from .modificacion import faltantes as faltantes_mod
 
@@ -100,6 +104,8 @@ def faltantes(partida):
 
 def duplicado_de(partida):
     """El material del Catálogo SAP que duplica EXACTO a esta partida (sección 8), o None."""
+    if partida.solicitud.flujo == "ASER_ZSA":
+        return duplicados.bloqueante(partida.servicio.descripcion, "", servicio=True)
     if partida.solicitud.flujo != "AMAT_ZRA":
         return None  # solo las altas buscan duplicados
     alta = partida.alta
@@ -268,17 +274,25 @@ def terminar_con_codigos(usuario, codigos):
     if movidas:
         raise AccionNoPermitida("Alguna partida ya no está en Datos Maestros. No se terminó ninguna. Recarga la página.")
 
+    from . import alta_servicio
+
+    tipos = {"AMAT_ZRA", "ASER_ZSA"}
+    if any(p.solicitud.flujo not in tipos for p in partidas):
+        raise AccionNoPermitida("El Código SAP solo se captura en altas de materiales y de servicios.")
     errores, vistos = {}, {}
     for p in partidas:
         codigo = codigos[p.pk]
-        error = _error_codigo(codigo)
-        if not error and codigo in vistos:
+        servicio = p.solicitud.flujo == "ASER_ZSA"
+        error = alta_servicio.error_codigo(codigo) if servicio else _error_codigo(codigo)
+        # Un servicio y un material pueden tener el mismo código: se cuentan por separado.
+        codigo_visto = (servicio, codigo)
+        if not error and codigo_visto in vistos:
             error = "Código repetido en esta captura."
         # Fase 4: tampoco se termina una partida sin imágenes (p. ej. una que llegó a DM antes
         # de esta fase). DM la devuelve a VAL_MAT para que le suban al menos una.
         if not error and p.solicitud.flujo == "AMAT_ZRA" and not p.imagenes.exists():
             error = "La partida no tiene imágenes. Devuélvela a VAL_MAT."
-        vistos.setdefault(codigo, p.pk)
+        vistos.setdefault(codigo_visto, p.pk)
         if error:
             errores[p.pk] = error
     if errores:
@@ -286,6 +300,14 @@ def terminar_con_codigos(usuario, codigos):
 
     try:
         for p in partidas:
+            if p.solicitud.flujo == "ASER_ZSA":
+                # Alta de servicio: entra al catálogo de servicios (sin Centro).
+                alta_servicio.terminar(usuario, p, codigos[p.pk])
+                anterior = p.estado
+                p.estado = E.TERMINADA
+                p.save(update_fields=["estado", "actualizada"])
+                _registrar(p, usuario, Evento.Tipo.CODIGO_SAP, anterior, detalle={"codigo": codigos[p.pk]})
+                continue
             alta = p.alta
             alta.codigo_sap = codigos[p.pk]
             alta.save(update_fields=["codigo_sap"])

@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 from catalogo_sap.models import MaterialCentro, MaterialSAP
 from catalogos.models import Almacen, CategoriaValoracion, Centro, GrupoCompras, Planificador
 
-from . import alcance, ampliacion, bandejas, duplicados, flujo, imagenes, lotes, modificacion, servicios
+from . import alcance, alta_servicio, ampliacion, bandejas, duplicados, flujo, imagenes, lotes, modificacion, servicios
 from .forms import CorreccionFormSet, PartidaCorreccionForm, PartidasFormSet
 from .models import DetalleAlta, Flujo, ImagenPartida, Partida, Solicitud
 
@@ -163,7 +163,7 @@ def detalle(request, pk):
             "partidas__alta", "partidas__centro", "partidas__ampliacion__material", "partidas__ampliacion__centro_origen",
             "partidas__ampliacion__almacen_destino", "partidas__ampliacion__almacen_modelo",
             "partidas__ampliacion__planificador", "partidas__ampliacion__grupo_compras",
-            "partidas__modificacion__material",
+            "partidas__modificacion__material", "partidas__servicio__umb", "partidas__servicio__grupo_articulos",
         ), pk=pk
     )
     if not puede_ver(request.user, solicitud):
@@ -207,7 +207,8 @@ def pendientes(request):
         t = filtros["texto"]
         # AMPL no tiene descripción propia: se busca en la del material y en su código.
         partidas = partidas.filter(Q(alta__descripcion__icontains=t) | Q(ampliacion__material__descripcion__icontains=t)
-                                   | Q(ampliacion__codigo_sap__startswith=t))
+                                   | Q(ampliacion__codigo_sap__startswith=t) | Q(servicio__descripcion__icontains=t)
+                                   | Q(modificacion__codigo_sap__startswith=t) | Q(modificacion__material__descripcion__icontains=t))
 
     # Motivos escritos antes de un error (ver accion_en_bloque): se muestran de nuevo una sola vez.
     capturados = request.session.pop("motivos_bandeja", {})
@@ -222,7 +223,9 @@ def pendientes(request):
         "partidas": partidas,
         "filtros": filtros,
         "hay_lote": activa == "dm" and lotes.pendientes(request.user).exists(),
-        "hay_amat": activa == "dm" and bandejas.partidas_de(request.user, "dm").filter(solicitud__flujo=Flujo.AMAT_ZRA).exists(),
+        "hay_amat": activa == "dm" and bandejas.partidas_de(request.user, "dm").filter(
+            solicitud__flujo__in=[Flujo.AMAT_ZRA, Flujo.ASER_ZSA]).exists(),
+        "hay_finalizar": activa == "dm" and lotes.pendientes(request.user, lotes.FLUJOS).exists(),
     })
 
 
@@ -282,7 +285,8 @@ def exportar_dm(request):
     """DM: un solo TXT con TODAS las partidas marcadas en la bandeja (ampliaciones o modificaciones),
     de uno o varios folios. Exportar no cambia estados: se puede repetir las veces que haga falta."""
     try:
-        nombre, texto = lotes.exportar(request.user, request.POST.getlist("partidas"))
+        codigos = {k.removeprefix("codigo-"): v for k, v in request.POST.items() if k.startswith("codigo-")}
+        nombre, texto = lotes.exportar(request.user, request.POST.getlist("partidas"), codigos)
     except flujo.AccionNoPermitida as e:
         messages.error(request, str(e))
         return _volver_a_bandeja(request)
@@ -350,8 +354,8 @@ def corregir_codigo(request, pk):
 @login_required
 def corregir(request, pk):
     """Tabla tipo Excel con solo las partidas que el usuario puede corregir ahora."""
-    solicitud = get_object_or_404(Solicitud, pk=pk, flujo__in=[Flujo.AMAT_ZRA, Flujo.AMPL_ZRA, Flujo.MOD_ZRA, Flujo.MOD_ZSA])
-    editables = list(servicios.partidas_editables(request.user, solicitud).select_related("alta", "ampliacion", "modificacion"))
+    solicitud = get_object_or_404(Solicitud, pk=pk, flujo__in=[Flujo.AMAT_ZRA, Flujo.AMPL_ZRA, Flujo.MOD_ZRA, Flujo.MOD_ZSA, Flujo.ASER_ZSA])
+    editables = list(servicios.partidas_editables(request.user, solicitud).select_related("alta", "ampliacion", "modificacion", "servicio"))
     if not editables:
         messages.error(request, "No tienes partidas de esta solicitud para corregir.")
         return redirect("solicitudes:detalle", pk=solicitud.pk)
@@ -359,6 +363,8 @@ def corregir(request, pk):
         return _corregir_ampl(request, solicitud, editables)
     if solicitud.flujo in modificacion.FLUJOS:
         return _corregir_mod(request, solicitud, editables)
+    if solicitud.flujo == Flujo.ASER_ZSA:
+        return _corregir_aser(request, solicitud, editables)
 
     # El Centro se puede cambiar solo por uno de los Centros autorizados del usuario.
     centros = request.user.centros.filter(activo=True)
@@ -899,6 +905,96 @@ def _corregir_mod(request, solicitud, editables):
         "servicio": modificacion.es_servicio(solicitud.flujo), "correccion": True, "puede_reenviar": puede_reenviar,
         "datos_automaticos": _datos_modificacion(centros, solicitud.flujo),
     })
+
+
+# --- Fase 4e: alta de servicios ASER_ZSA -------------------------------------------------
+
+
+@login_required
+def capturar_aser(request, pk=None):
+    """Nueva solicitud ASER_ZSA o edición de un borrador propio."""
+    if not servicios.puede_capturar(request.user):
+        raise PermissionDenied("Necesitas el rol SOL_MAT o VAL_MAT.")
+    solicitud = None
+    if pk:
+        solicitud = get_object_or_404(Solicitud, pk=pk, flujo=Flujo.ASER_ZSA, solicitante=request.user)
+        if solicitud.estado != Solicitud.Estado.BORRADOR:
+            return redirect("solicitudes:detalle", pk=solicitud.pk)
+
+    if request.method == "POST":
+        formset = alta_servicio.ServicioFormSet(request.POST)
+        accion = request.POST.get("accion")
+        if accion == "eliminar" or (formset.is_valid() and not formset.renglones and accion not in ("enviar", "validar")):
+            if solicitud is not None:
+                servicios.eliminar_borrador(solicitud)
+                messages.success(request, "Borrador eliminado.")
+            else:
+                messages.info(request, "No había partidas; no se guardó nada.")
+            return redirect("solicitudes:mis_solicitudes")
+        # Igual que las demás capturas: Enter, Guardar y Enviar guardan y luego validan; solo Enviar envía.
+        elif not formset.is_valid():
+            messages.error(request, "Hay valores inválidos; no se guardó nada. Corrige las celdas marcadas.")
+        elif not formset.renglones:
+            messages.error(request, "Agrega al menos una partida antes de enviar.")
+        else:
+            solicitud = alta_servicio.guardar_borrador(request.user, formset, solicitud)
+            listo, avisos = formset.validar_para_envio()
+            for aviso in avisos:
+                messages.warning(request, aviso)
+            if listo and accion == "enviar":
+                solicitud = alta_servicio.enviar(request.user, formset, solicitud)
+                messages.success(request, f"Solicitud enviada con folio {solicitud.folio}.")
+                return redirect("solicitudes:detalle", pk=solicitud.pk)
+            if listo:
+                messages.success(request, "Borrador guardado. Todo está correcto: ya puedes enviar.")
+                return redirect("solicitudes:editar_aser", pk=solicitud.pk)
+            no_envio = "; no se envió" if accion == "enviar" else ""
+            messages.error(request, f"Borrador guardado{no_envio}. Hay celdas por corregir antes de enviar (marcadas en rojo).")
+    else:
+        iniciales = alta_servicio.filas_iniciales(solicitud) if solicitud else alta_servicio.filas_nuevas()
+        formset = alta_servicio.ServicioFormSet(initial=iniciales)
+    return render(request, "solicitudes/capturar_aser.html", _contexto_aser(solicitud, formset))
+
+
+def _contexto_aser(solicitud, formset, **extra):
+    umb = alta_servicio.umb_propuesta()
+    return {"solicitud": solicitud, "formset": formset, "datos_automaticos": {"umb": str(umb.pk) if umb else ""},
+            "sin_umb": umb is None, **extra}
+
+
+def _corregir_aser(request, solicitud, editables):
+    es_solicitante = solicitud.solicitante_id == request.user.pk
+    puede_reenviar = es_solicitante and any(p.estado == Partida.Estado.DEVUELTA_SOL for p in editables)
+    iniciales = [{"pid": p.pk, "numero": p.numero, "descripcion": p.servicio.descripcion, "umb": p.servicio.umb_id,
+                  "grupo_articulos": p.servicio.grupo_articulos_id} for p in editables]
+    if request.method == "POST":
+        formset = alta_servicio.ServicioCorreccionFormSet(request.POST, initial=iniciales)
+        accion = request.POST.get("accion")
+        valido = formset.validar_para_envio()[0] if accion == "reenviar" else formset.is_valid()
+        if valido:
+            devueltas = {p.pk for p in editables if p.estado == Partida.Estado.DEVUELTA_SOL}
+            try:
+                with transaction.atomic():
+                    n = alta_servicio.guardar_correcciones(request.user, formset.renglones, solicitud)
+                    if accion == "reenviar":
+                        ids = [f.cleaned_data["pid"] for f in formset.renglones if f.cleaned_data["pid"] in devueltas]
+                        flujo.aplicar(request.user, "reenviar", ids)
+            except (PermissionError, flujo.AccionNoPermitida) as e:
+                messages.error(request, str(e))
+                return redirect("solicitudes:detalle", pk=solicitud.pk)
+            if accion == "reenviar":
+                messages.success(request, f"Partidas reenviadas ({n} campo(s) corregido(s)).")
+                return redirect("solicitudes:detalle", pk=solicitud.pk)
+            messages.success(request, f"Correcciones guardadas: {n} campo(s) cambiado(s).")
+            return redirect("solicitudes:corregir", pk=solicitud.pk)
+        messages.error(request, "No se guardó nada. Corrige las celdas marcadas; tus datos siguen en pantalla.")
+    else:
+        formset = alta_servicio.ServicioCorreccionFormSet(initial=iniciales)
+    estados = {p.pk: p.get_estado_display() for p in editables}
+    for form in formset:
+        form.estado_partida = estados.get(_entero(form["pid"].value()), "")
+    return render(request, "solicitudes/capturar_aser.html",
+                  _contexto_aser(solicitud, formset, correccion=True, puede_reenviar=puede_reenviar))
 
 
 def _corregir_ampl(request, solicitud, editables):

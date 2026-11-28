@@ -47,8 +47,8 @@
         {# Ampliaciones y modificaciones: un solo TXT con todo lo marcado, de uno o varios folios. #}
         <span class="vr mx-1"></span>
         <button formaction="{% url 'solicitudes:exportar_dm' %}" class="btn btn-outline-primary btn-sm" data-exportar>Exportar TXT</button>
-        <button name="accion" value="excluir" class="btn btn-outline-danger btn-sm" data-verbo="excluir" data-motivo>Excluir</button>
-        <button formaction="{% url 'solicitudes:finalizar_dm' %}" class="btn btn-outline-success btn-sm" data-verbo="finalizar">Finalizar seleccionadas</button>
+        {% if hay_finalizar %}<button name="accion" value="excluir" class="btn btn-outline-danger btn-sm" data-verbo="excluir" data-motivo>Excluir</button>{% endif %}
+        {% if hay_finalizar %}<button formaction="{% url 'solicitudes:finalizar_dm' %}" class="btn btn-outline-success btn-sm" data-verbo="finalizar">Finalizar seleccionadas</button>{% endif %}
       {% endif %}
     {% endif %}
     <span class="text-secondary small">Para devolver o cancelar, escribe el motivo de cada partida en su renglón.</span>
@@ -76,6 +76,10 @@
             {# Ampliación: material que ya existe, hacia un Centro nuevo. #}
             <td><a class="text-reset" href="{% url 'solicitudes:partida' p.pk %}">Ampliar {{ p.ampliacion.codigo_sap }} · {{ p.ampliacion.material.descripcion }}</a></td>
             <td>—</td><td>—</td><td>desde {{ p.ampliacion.centro_origen.codigo|default:"—" }}</td>
+          {% elif p.solicitud.flujo == "ASER_ZSA" %}
+            {# Alta de servicio: sin Centro ni No. Parte. #}
+            <td><a class="text-reset" href="{% url 'solicitudes:partida' p.pk %}">Servicio · {{ p.servicio.descripcion }}</a></td>
+            <td>{{ p.servicio.umb.codigo|default:"—" }}</td><td>{{ p.servicio.grupo_articulos.codigo|default:"—" }}</td><td>—</td>
           {% elif p.solicitud.flujo == "MOD_ZRA" or p.solicitud.flujo == "MOD_ZSA" %}
             {# Modificación: qué dato cambia y de qué a qué. #}
             {% with m=p.modificacion %}
@@ -96,7 +100,7 @@
             <textarea class="form-control form-control-sm wd-motivo" name="motivo-{{ p.pk }}" rows="1" aria-label="Motivo de {{ p.solicitud.folio }}/{{ p.numero }}">{{ p.motivo_capturado|default:'' }}</textarea></td>
           {% if activa == "dm" and p.solicitud.flujo == "AMPL_ZRA" %}
             <td class="text-secondary small">Ampliación</td>
-          {% elif activa == "dm" and p.solicitud.flujo != "AMAT_ZRA" %}
+          {% elif activa == "dm" and p.solicitud.flujo == "MOD_ZRA" or activa == "dm" and p.solicitud.flujo == "MOD_ZSA" %}
             <td class="text-secondary small">Modificación</td>
           {% elif activa == "dm" %}
             <td class="{% if p.error_codigo %}con-error{% endif %}">
@@ -112,7 +116,7 @@
       </tbody>
     </table>
   </div>
-  {% if activa == "dm" and hay_lote %}<p class="text-secondary small mt-2">Ampliaciones y modificaciones: marca las partidas y usa <b>Exportar TXT</b> (un solo archivo con todo lo marcado, aunque sean de varios folios; Amp_Mat.txt, Mod_Mat.txt o Mod_Ser.txt, un tipo a la vez). Exportar no cambia nada; cuando SAP ya las tenga, márcalas otra vez y <b>Finalizar seleccionadas</b>.</p>{% endif %}
+  {% if activa == "dm" and hay_lote %}<p class="text-secondary small mt-2">Marca las partidas y usa <b>Exportar TXT</b>: un solo archivo con todo lo marcado, aunque sean de varios folios, de un tipo a la vez (Amp_Mat.txt, Mod_Mat.txt, Mod_Ser.txt o Alta_Ser.txt; este último lleva el Código SAP que escribas en el renglón). Exportar no cambia nada. Ampliaciones y modificaciones se terminan con <b>Finalizar seleccionadas</b>; altas de servicios y materiales, con su Código SAP.</p>{% endif %}
   {% if activa == "dm" and hay_amat %}<p class="text-secondary small mt-2">Puedes pegar una columna de códigos desde Excel en la primera celda de Código SAP: se llenan hacia abajo. Solo se terminan las partidas que tienen código.</p>{% endif %}
   <p class="text-secondary small mt-2">Haz clic en el folio de una partida para ver su ficha completa, corregirla o actuar solo sobre ella.</p>
 </form>

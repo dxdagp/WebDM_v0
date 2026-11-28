@@ -5,7 +5,7 @@ Centros". Las modificaciones (MOD_ZRA y MOD_ZSA) traen datos GENERALES del mater
 son de ningún Centro (descripción, marca, año…). Para esas partidas, sin Centro, la regla es:
 
 - MOD_ZRA: le tocan a quien tenga autorizado alguno de los Centros donde existe el material.
-- MOD_ZSA: los servicios no tienen Centro, así que le tocan a cualquier VAL_MAT o DM.
+- MOD_ZSA y ASER_ZSA: los servicios no tienen Centro, así que le tocan a cualquier VAL_MAT o DM.
 
 Todas las bandejas y revisiones de alcance usan estas dos funciones, así la regla vive en un solo lugar.
 """
@@ -27,7 +27,8 @@ def de_mis_centros(usuario):
     """
     mis = usuario.centros.values("pk")
     en_mis_centros = Exists(MaterialCentro.objects.filter(material=OuterRef("modificacion__material"), centro__in=mis))
-    return Q(centro__in=mis) | (Q(centro__isnull=True) & (Q(modificacion__material__es_servicio=True) | en_mis_centros))
+    sin_centro = Q(solicitud__flujo="ASER_ZSA") | Q(modificacion__material__es_servicio=True) | en_mis_centros
+    return Q(centro__in=mis) | (Q(centro__isnull=True) & sin_centro)
 
 
 def en_mi_alcance(usuario, partida):
@@ -35,6 +36,8 @@ def en_mi_alcance(usuario, partida):
     mis = set(usuario.centros.values_list("pk", flat=True))
     if partida.centro_id is not None:
         return partida.centro_id in mis
+    if partida.solicitud.flujo == "ASER_ZSA":
+        return True  # alta de servicio: no tiene Centro, la atiende cualquier VAL_MAT o DM
     detalle = getattr(partida, "modificacion", None)
     if detalle is None or detalle.material_id is None:
         return False
