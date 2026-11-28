@@ -104,6 +104,12 @@ def consulta(request, catalogo="materiales"):
     """
     datos_catalogo = CATALOGOS[catalogo]
     renglones, columnas, hay_filtros = _filtrar(request, datos_catalogo["servicio"])
+    # Pedido de Dave: al entrar no se carga nada. Primero se filtra; con los filtros vacíos, todo.
+    # El formulario de filtros siempre manda "buscar=1". Un enlace con algún filtro o exportar también cuenta.
+    # Al entrar (sin nada en la URL) la consulta no se ejecuta.
+    buscado = any(k in request.GET for k in ["buscar", "exportar", *(c["nombre"] for c in columnas)])
+    if not buscado:
+        renglones = renglones.none()  # .none() no va a la base: cero consultas
     formato = request.GET.get("exportar")
     if formato in exportar.FORMATOS:
         # Exporta TODO lo que dejan los filtros, no solo la página de 50.
@@ -111,7 +117,7 @@ def consulta(request, catalogo="materiales"):
     return render(request, "catalogo_sap/consulta.html", {
         "catalogo": catalogo, "titulo": datos_catalogo["titulo"], "es_servicios": datos_catalogo["servicio"],
         "puede_importar": puede_importar(request.user), "filtros_url": _sin_pagina(request),
-        "columnas": columnas, "hay_filtros": hay_filtros, "centros": Centro.objects.order_by("codigo"),
+        "columnas": columnas, "hay_filtros": hay_filtros, "buscado": buscado, "centros": Centro.objects.order_by("codigo"),
         "origenes": MaterialSAP.Origen.choices,
         "pagina": Paginator(renglones, 50).get_page(request.GET.get("pagina")),
     })

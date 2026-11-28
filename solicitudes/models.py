@@ -184,13 +184,23 @@ class DetalleModificacion(models.Model):
         VERSION = "VERSION", "Versión"
         ANIO_MODELO = "ANIO_MODELO", "Año Modelo"
         COMPATIBILIDAD = "COMPATIBILIDAD", "Compatibilidad"
+        # Datos que en SAP dependen del Centro (Dave, 28-nov-2026): piden Centro.
+        GRUPO_COMPRAS = "GRUPO_COMPRAS", "Grupo de compras"
+        ALMACEN = "ALMACEN", "Almacén"
+        CEBE = "CEBE", "CeBe"
 
     # Servicios solo pueden modificar estos dos (indicación de Dave, 27-nov-2026).
     CAMPOS_SERVICIO = {Campo.DESCRIPCION, Campo.GRUPO_ARTICULOS}
+    # Los únicos que se capturan con Centro; los demás son generales del material.
+    CAMPOS_POR_CENTRO = {Campo.GRUPO_COMPRAS, Campo.ALMACEN, Campo.CEBE}
 
     partida = models.OneToOneField(Partida, on_delete=models.CASCADE, primary_key=True, related_name="modificacion")
+    # Lo que escribió el usuario; `material` es el del catálogo que le corresponde (igual que en AMPL).
+    codigo_sap = models.CharField("Código SAP", max_length=6, blank=True)
     material = models.ForeignKey("catalogo_sap.MaterialSAP", on_delete=models.PROTECT, null=True, blank=True)
     campo = models.CharField("dato a modificar", max_length=20, choices=Campo.choices, blank=True)
+    # Foto del catálogo al capturar: así VAL_MAT y DM ven qué cambia, aunque luego cambie el catálogo.
+    valor_actual = models.CharField("valor actual", max_length=40, blank=True)
     valor_nuevo = models.CharField("valor nuevo", max_length=40, blank=True)
 
     class Meta:

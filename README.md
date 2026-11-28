@@ -28,5 +28,6 @@ La explicación paso a paso, incluida la creación de la base de datos en Postgr
 | 4a | Imágenes y búsqueda de duplicados ([guía](docs/fase-4.md)) | Hecha |
 | 4b | Catálogos SAP de materiales y servicios, importación del TXT ([guía](docs/fase-4b.md)) | Hecha |
 | 4c | AMPL_ZRA: ampliación a Centro y exportación Amp_Mat.txt ([guía](docs/fase-4c.md)) | Hecha |
-| 4d | Modificaciones, alta de servicios, vencimientos | Pendiente |
+| 4d | MOD_ZRA y MOD_ZSA: modificación de materiales y servicios ([guía](docs/fase-4d.md)) | Hecha |
+| 4e | Alta de servicios (ASER_ZSA) y vencimientos | Pendiente |
 | 5 | Despliegue en Ubuntu (Nginx, Gunicorn, systemd) | Pendiente |

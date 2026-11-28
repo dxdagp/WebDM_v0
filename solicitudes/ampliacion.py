@@ -426,22 +426,6 @@ def partidas_dm(usuario, solicitud=None, ids=None):
     ).order_by("solicitud__folio", "numero")
 
 
-def seleccion_dm(usuario, ids):
-    """Las partidas que DM marcó en su bandeja. Todas o ninguna: si alguna no es una ampliación
-    pendiente de este DM (por ejemplo, un alta AMAT), no se hace nada y se dice cuál."""
-    from .flujo import AccionNoPermitida
-
-    ids = {int(i) for i in ids if str(i).isdigit()}
-    if not ids:
-        raise AccionNoPermitida("Selecciona al menos una ampliación.")
-    partidas = list(partidas_dm(usuario, ids=ids))
-    if len(partidas) != len(ids):
-        sobran = Partida.objects.filter(pk__in=ids - {p.pk for p in partidas}).select_related("solicitud")
-        nombres = ", ".join(f"{x.solicitud.folio}/{x.numero}" for x in sobran[:5])
-        raise AccionNoPermitida(f"Solo se exportan o finalizan ampliaciones en Datos Maestros. Quita de la selección: {nombres}.")
-    return partidas
-
-
 def renglon_txt(partida):
     """Las 9 columnas del TXT, en el orden que pidió Dave."""
     a = partida.ampliacion
@@ -459,22 +443,30 @@ def texto_txt(partidas):
 
 
 @transaction.atomic
-def finalizar(usuario, solicitud=None, ids=None):
+def finalizar(usuario, solicitud):
     """Las partidas EN_DM (no excluidas) de los Centros de este DM pasan a TERMINADA y su Centro
     nuevo se agrega al material en el catálogo (pedido de Dave: es una nueva ubicación).
 
     Si mientras tanto alguien importó ese Material + Centro desde SAP, no se duplica: se termina igual.
     Devuelve cuántas partidas terminó.
     """
-    from .flujo import AccionNoPermitida, _registrar, actualizar_cabecera, roles_de
+    from .flujo import AccionNoPermitida, actualizar_cabecera, roles_de
 
     if "DM" not in roles_de(usuario):
         raise AccionNoPermitida("Necesitas el rol DM.")
-    if ids is not None:
-        seleccion_dm(usuario, ids)  # revisa que todo lo marcado sea una ampliación pendiente
-    partidas = list(partidas_dm(usuario, solicitud, ids).select_for_update(of=("self",)))
+    partidas = list(partidas_dm(usuario, solicitud).select_for_update(of=("self",)))
     if not partidas:
         raise AccionNoPermitida("No hay partidas en Datos Maestros para finalizar.")
+    finalizar_partidas(usuario, partidas)
+    for cabecera in {p.solicitud_id: p.solicitud for p in partidas}.values():
+        actualizar_cabecera(cabecera, usuario)  # cada folio pasa a TERMINADA si ya no le queda nada
+    return len(partidas)
+
+
+def finalizar_partidas(usuario, partidas):
+    """Agrega el Centro nuevo de cada partida al catálogo y la pasa a TERMINADA (ya vienen bloqueadas)."""
+    from .flujo import AccionNoPermitida, _registrar
+
     for p in partidas:
         a = p.ampliacion
         material = a.material or material_de(a.codigo_sap)
@@ -492,6 +484,3 @@ def finalizar(usuario, solicitud=None, ids=None):
         p.estado = E.TERMINADA
         p.save(update_fields=["estado", "actualizada"])
         _registrar(p, usuario, Evento.Tipo.TERMINACION, anterior)
-    for cabecera in {p.solicitud_id: p.solicitud for p in partidas}.values():
-        actualizar_cabecera(cabecera, usuario)  # cada folio pasa a TERMINADA si ya no le queda nada
-    return len(partidas)

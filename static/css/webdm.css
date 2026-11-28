@@ -135,3 +135,10 @@ td.wd-error { background: #FFEBE9; }
 
 /* Botón por omisión del formulario de captura: existe para que Enter valide, pero no se ve. */
 .wd-enter { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+/* Fase 4d: tabla de modificaciones (MOD_ZRA / MOD_ZSA). */
+.wd-tabla-mod { min-width: 0; }
+.wd-tabla-mod input, .wd-tabla-mod select { min-width: 120px; }
+.wd-tabla-mod td.auto input { min-width: 50px; width: 60px; }
+.wd-tabla-mod input[name$="-valor_nuevo"] { min-width: 300px; }
+.wd-tabla-mod td.auto[data-auto] { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }

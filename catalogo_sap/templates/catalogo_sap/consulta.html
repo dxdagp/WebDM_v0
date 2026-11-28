@@ -5,15 +5,17 @@
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
   <div>
     <div class="text-secondary small">Consulta / {{ titulo }}</div>
-    <h1 class="h4 fw-bold mb-0">{{ titulo }} <small class="text-secondary fw-normal fs-6">{{ pagina.paginator.count }} {% if es_servicios %}código(s){% else %}renglón(es) material-centro{% endif %}</small></h1>
+    <h1 class="h4 fw-bold mb-0">{{ titulo }}</h1>
   </div>
   {% if puede_importar %}<a class="btn btn-outline-primary" href="{% url 'catalogo_sap:importar' %}?catalogo={% if catalogo == 'servicios' %}SERVICIOS{% else %}MATERIALES{% endif %}">Importar TXT de SAP</a>{% endif %}
 </div>
 
 {# Tabla tipo Excel, como la captura. El segundo renglón del encabezado son los filtros: escribe y presiona Enter. #}
 <form method="get" id="filtros" class="d-flex gap-2 mb-2">
-  <button class="btn btn-sm btn-outline-secondary">Filtrar</button>
+  <input type="hidden" name="buscar" value="1">
+  <button class="btn btn-sm btn-primary">Buscar</button>
   {% if hay_filtros %}<a class="btn btn-sm btn-link" href="?">Quitar filtros</a>{% endif %}
+  {% if buscado %}
   {# Exportar: lo que dejan los filtros, todas las páginas. Un <details> abre y cierra el menú sin JavaScript. #}
   <details class="wd-exportar">
     <summary class="btn btn-sm btn-outline-secondary">Exportar ▾</summary>
@@ -24,7 +26,8 @@
       <a href="?{{ filtros_url }}&amp;exportar=xlsx">Excel (.xlsx)</a>
     </div>
   </details>
-  <span class="small text-secondary align-self-center">Escribe en el renglón de filtros (bajo los encabezados) y presiona Enter.{% if not es_servicios %} Clic en el código para ver el material completo.{% endif %}</span>
+  {% endif %}
+  <span class="small text-secondary align-self-center">Escribe en el renglón de filtros (bajo los encabezados) y presiona Enter o Buscar. Con los filtros vacíos se muestra todo.{% if not es_servicios %} Clic en el código para ver el material completo.{% endif %}</span>
 </form>
 <div class="wd-tabla-caja">
   <table class="wd-tabla wd-catalogo">
@@ -60,7 +63,7 @@
         <td>{% include "catalogo_sap/_origen_texto.html" %}</td>
       </tr>
     {% empty %}
-      <tr><td colspan="6" class="vacia">No hay servicios{% if hay_filtros %} con esos filtros{% endif %}.</td></tr>
+      <tr><td colspan="6" class="vacia">{% if not buscado %}Filtra lo que quieres ver y presiona Buscar. Con los filtros vacíos se muestran todos.{% else %}No hay servicios{% if hay_filtros %} con esos filtros{% endif %}.{% endif %}</td></tr>
     {% endfor %}
     </tbody>
   {% else %}
@@ -87,12 +90,14 @@
         <td>{% include "catalogo_sap/_origen_texto.html" %}</td>
       </tr>
     {% endwith %}{% empty %}
-      <tr><td colspan="18" class="vacia">No hay materiales{% if hay_filtros %} con esos filtros{% endif %}.</td></tr>
+      <tr><td colspan="18" class="vacia">{% if not buscado %}Filtra lo que quieres ver y presiona Buscar. Con los filtros vacíos se muestran todos.{% else %}No hay materiales{% if hay_filtros %} con esos filtros{% endif %}.{% endif %}</td></tr>
     {% endfor %}
     </tbody>
   {% endif %}
   </table>
 </div>
+{# Pedido de Dave: bajo la tabla, en pequeño, cuántos resultados se encontraron (todas las páginas). #}
+{% if buscado %}<p class="small text-secondary mt-1 mb-2">{{ pagina.paginator.count }} resultado(s) encontrado(s){% if pagina.paginator.num_pages > 1 %}, mostrando del {{ pagina.start_index }} al {{ pagina.end_index }}{% endif %}.</p>{% endif %}
 {% include "catalogo_sap/_paginas.html" with pagina=pagina %}
 {% endblock %}
 {% block scripts %}<script src="{% static 'js/exportar.js' %}"></script>{% endblock %}
