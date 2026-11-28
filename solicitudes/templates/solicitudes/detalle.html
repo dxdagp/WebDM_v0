@@ -27,6 +27,21 @@
     </tbody>
   </table>
 </div>
+{% elif solicitud.flujo == "MOD_ZRA" or solicitud.flujo == "MOD_ZSA" %}
+<div class="wd-tabla-caja mb-4">
+  <table class="wd-tabla wd-catalogo">
+    <thead><tr><th>Partida</th><th>{% if solicitud.flujo == "MOD_ZSA" %}Servicio{% else %}Material{% endif %}</th><th>Descripción</th>
+               {% if solicitud.flujo == "MOD_ZRA" %}<th>Centro</th>{% endif %}<th>Dato</th><th>Valor actual</th><th>Valor nuevo</th><th>Estado</th></tr></thead>
+    <tbody>
+    {% for p in solicitud.partidas.all %}{% with m=p.modificacion %}
+      <tr id="partida-{{ p.numero }}"><td>{{ p.numero }}</td><td>{{ m.codigo_sap|default:"—" }}</td><td>{{ m.material.descripcion|default:"—" }}</td>
+          {% if solicitud.flujo == "MOD_ZRA" %}<td>{{ p.centro.codigo|default:"General" }}</td>{% endif %}
+          <td>{{ m.get_campo_display|default:"—" }}</td><td>{{ m.valor_actual|default:"(vacío)" }}</td><td>{{ m.valor_nuevo|default:"—" }}</td>
+          <td><span class="wd-estado">{{ p.estado }}</span></td></tr>
+    {% endwith %}{% endfor %}
+    </tbody>
+  </table>
+</div>
 {% else %}
 <div class="wd-tabla-caja mb-4">
   <table class="table mb-0 align-middle">

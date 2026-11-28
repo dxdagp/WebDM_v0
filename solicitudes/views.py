@@ -12,10 +12,10 @@ from django.urls import reverse
 from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
-from catalogo_sap.models import MaterialSAP
+from catalogo_sap.models import MaterialCentro, MaterialSAP
 from catalogos.models import Almacen, CategoriaValoracion, Centro, GrupoCompras, Planificador
 
-from . import ampliacion, bandejas, duplicados, flujo, imagenes, servicios
+from . import alcance, ampliacion, bandejas, duplicados, flujo, imagenes, lotes, modificacion, servicios
 from .forms import CorreccionFormSet, PartidaCorreccionForm, PartidasFormSet
 from .models import DetalleAlta, Flujo, ImagenPartida, Partida, Solicitud
 
@@ -151,7 +151,7 @@ def puede_ver(usuario, solicitud):
     if "ADMIN" in roles:
         return True
     if roles & {"VAL_MAT", "DM"}:
-        return solicitud.partidas.filter(centro__in=usuario.centros.values("pk")).exists()
+        return solicitud.partidas.filter(alcance.de_mis_centros(usuario)).exists()
     return False
 
 
@@ -163,6 +163,7 @@ def detalle(request, pk):
             "partidas__alta", "partidas__centro", "partidas__ampliacion__material", "partidas__ampliacion__centro_origen",
             "partidas__ampliacion__almacen_destino", "partidas__ampliacion__almacen_modelo",
             "partidas__ampliacion__planificador", "partidas__ampliacion__grupo_compras",
+            "partidas__modificacion__material",
         ), pk=pk
     )
     if not puede_ver(request.user, solicitud):
@@ -220,8 +221,8 @@ def pendientes(request):
         "activa": activa,
         "partidas": partidas,
         "filtros": filtros,
-        "hay_ampl": activa == "dm" and bandejas.partidas_de(request.user, "dm").filter(solicitud__flujo=Flujo.AMPL_ZRA).exists(),
-        "hay_amat": activa == "dm" and bandejas.partidas_de(request.user, "dm").exclude(solicitud__flujo=Flujo.AMPL_ZRA).exists(),
+        "hay_lote": activa == "dm" and lotes.pendientes(request.user).exists(),
+        "hay_amat": activa == "dm" and bandejas.partidas_de(request.user, "dm").filter(solicitud__flujo=Flujo.AMAT_ZRA).exists(),
     })
 
 
@@ -277,31 +278,29 @@ def _volver_a_bandeja(request):
 
 @login_required
 @require_POST
-def exportar_ampl(request):
-    """DM: un solo Amp_Mat.txt con TODAS las ampliaciones marcadas en la bandeja, de uno o varios folios.
-
-    Exportar no cambia estados (sección 10.4): se puede repetir las veces que haga falta.
-    """
+def exportar_dm(request):
+    """DM: un solo TXT con TODAS las partidas marcadas en la bandeja (ampliaciones o modificaciones),
+    de uno o varios folios. Exportar no cambia estados: se puede repetir las veces que haga falta."""
     try:
-        partidas = ampliacion.seleccion_dm(request.user, request.POST.getlist("partidas"))
+        nombre, texto = lotes.exportar(request.user, request.POST.getlist("partidas"))
     except flujo.AccionNoPermitida as e:
         messages.error(request, str(e))
         return _volver_a_bandeja(request)
-    respuesta = HttpResponse(ampliacion.texto_txt(partidas), content_type="text/plain; charset=utf-8")
-    respuesta["Content-Disposition"] = f'attachment; filename="{ampliacion.NOMBRE_TXT}"'
+    respuesta = HttpResponse(texto, content_type="text/plain; charset=utf-8")
+    respuesta["Content-Disposition"] = f'attachment; filename="{nombre}"'
     return respuesta
 
 
 @login_required
 @require_POST
-def finalizar_ampl(request):
-    """DM: termina las ampliaciones marcadas y agrega su Centro nuevo al catálogo de materiales."""
+def finalizar_dm(request):
+    """DM: termina lo marcado. Ampliación: el Centro nuevo entra al catálogo. Modificación: el valor nuevo."""
     try:
-        n = ampliacion.finalizar(request.user, ids=request.POST.getlist("partidas"))
+        n = lotes.finalizar(request.user, request.POST.getlist("partidas"))
     except flujo.AccionNoPermitida as e:
         messages.error(request, str(e))
     else:
-        messages.success(request, f"{n} ampliación(es) terminada(s); su Centro nuevo ya está en el catálogo de materiales.")
+        messages.success(request, f"{n} partida(s) terminada(s); el catálogo ya tiene los cambios.")
     return _volver_a_bandeja(request)
 
 
@@ -351,13 +350,15 @@ def corregir_codigo(request, pk):
 @login_required
 def corregir(request, pk):
     """Tabla tipo Excel con solo las partidas que el usuario puede corregir ahora."""
-    solicitud = get_object_or_404(Solicitud, pk=pk, flujo__in=[Flujo.AMAT_ZRA, Flujo.AMPL_ZRA])
-    editables = list(servicios.partidas_editables(request.user, solicitud).select_related("alta", "ampliacion"))
+    solicitud = get_object_or_404(Solicitud, pk=pk, flujo__in=[Flujo.AMAT_ZRA, Flujo.AMPL_ZRA, Flujo.MOD_ZRA, Flujo.MOD_ZSA])
+    editables = list(servicios.partidas_editables(request.user, solicitud).select_related("alta", "ampliacion", "modificacion"))
     if not editables:
         messages.error(request, "No tienes partidas de esta solicitud para corregir.")
         return redirect("solicitudes:detalle", pk=solicitud.pk)
     if solicitud.flujo == Flujo.AMPL_ZRA:
         return _corregir_ampl(request, solicitud, editables)
+    if solicitud.flujo in modificacion.FLUJOS:
+        return _corregir_mod(request, solicitud, editables)
 
     # El Centro se puede cambiar solo por uno de los Centros autorizados del usuario.
     centros = request.user.centros.filter(activo=True)
@@ -472,13 +473,13 @@ PESTANA_DE_ESTADO = {
 def _acciones_posibles(usuario, partida):
     """Acciones de flujo.TRANSICIONES que este usuario puede aplicar a esta partida ahora."""
     roles = flujo.roles_de(usuario)
-    en_mis_centros = usuario.centros.filter(pk=partida.centro_id).exists()
+    en_mis_centros = alcance.en_mi_alcance(usuario, partida)
     acciones = []
     for clave, t in flujo.TRANSICIONES.items():
         if t.desde != partida.estado or t.rol not in roles or clave in flujo.SOLO_AMPLIACION:
             continue  # excluir es solo de AMPL, que se atiende en su propia pantalla de DM
-        alcance = partida.solicitud.solicitante_id == usuario.pk if t.solo_propias else en_mis_centros
-        if alcance:
+        permitido = partida.solicitud.solicitante_id == usuario.pk if t.solo_propias else en_mis_centros
+        if permitido:
             etiqueta, clase = ETIQUETAS_ACCION[clave]
             acciones.append({"clave": clave, "etiqueta": etiqueta, "clase": clase, "pide_motivo": t.pide_motivo})
     return acciones
@@ -496,8 +497,8 @@ def partida(request, pk):
     solicitud = p.solicitud
     if not puede_ver(request.user, solicitud):
         raise PermissionDenied("Esta partida no es tuya ni de tus Centros.")
-    if solicitud.flujo == Flujo.AMPL_ZRA:
-        # AMPL no tiene ficha por partida: sus datos caben en un renglón del detalle.
+    if solicitud.flujo != Flujo.AMAT_ZRA:
+        # AMPL y MOD no tienen ficha por partida: sus datos caben en un renglón del detalle.
         return redirect(f"{reverse('solicitudes:detalle', args=[solicitud.pk])}#partida-{p.numero}")
 
     editable = servicios.partidas_editables(request.user, solicitud).filter(pk=p.pk).exists()
@@ -751,6 +752,152 @@ def capturar_ampl(request, pk=None):
     return render(request, "solicitudes/capturar_ampl.html", {
         "solicitud": solicitud, "formset": formset, "datos_automaticos": _datos_ampliacion(centros),
         "sin_centros": not centros.exists(),
+    })
+
+
+# --- Fase 4d: modificaciones MOD_ZRA (materiales) y MOD_ZSA (servicios) -------------------
+
+TIPOS_MOD = {"materiales": Flujo.MOD_ZRA, "servicios": Flujo.MOD_ZSA}
+URL_MOD = {v: k for k, v in TIPOS_MOD.items()}
+
+
+def _flujo_mod(tipo):
+    if tipo not in TIPOS_MOD:
+        raise Http404("Tipo de modificación desconocido.")
+    return TIPOS_MOD[tipo]
+
+
+def _datos_modificacion(centros, flujo_mod):
+    """Lo que usa static/js/modificacion.js: la lista de datos, sus catálogos y la URL del material."""
+    from catalogos.models import GrupoArticulos, UbicacionRefaccion
+
+    por_centro = lambda modelo: {  # noqa: E731
+        str(c.pk): [x.codigo for x in modelo.objects.filter(centro=c, activo=True).order_by("codigo")] for c in centros
+    }
+    return {
+        "campos": [{"valor": c.value, "texto": c.label, "porCentro": c in modificacion.POR_CENTRO}
+                   for c in modificacion.campos_de(flujo_mod)],
+        "catalogos": {
+            "GRUPO_ARTICULOS": list(GrupoArticulos.objects.filter(activo=True).order_by("codigo").values_list("codigo", flat=True)),
+            "UBICACION": list(UbicacionRefaccion.objects.filter(activo=True).order_by("codigo").values_list("codigo", flat=True)),
+        },
+        "porCentro": {"GRUPO_COMPRAS": por_centro(GrupoCompras), "ALMACEN": por_centro(Almacen)},
+        "centros": {c.codigo: str(c.pk) for c in centros},
+        "servicio": modificacion.es_servicio(flujo_mod),
+        "urlMaterial": reverse("solicitudes:material_mod") + f"?tipo={URL_MOD[flujo_mod]}",
+    }
+
+
+@login_required
+def material_mod(request):
+    """JSON para la captura MOD: descripción del material y el valor actual de cada dato."""
+    flujo_mod = _flujo_mod(request.GET.get("tipo", ""))
+    material = modificacion.material_de(request.GET.get("codigo", "").strip(), flujo_mod)
+    if material is None:
+        return JsonResponse({"existe": False})
+    generales = {c.value: modificacion.valor_actual(material, c) for c in modificacion.campos_de(flujo_mod)
+                 if c not in modificacion.POR_CENTRO}
+    por_centro = {
+        str(mc.centro_id): {c.value: modificacion.valor_actual(material, c, mc) for c in modificacion.POR_CENTRO}
+        for mc in MaterialCentro.objects.filter(material=material)
+    }
+    return JsonResponse({"existe": True, "descripcion": material.descripcion, "valores": generales, "porCentro": por_centro})
+
+
+@login_required
+def capturar_mod(request, tipo, pk=None):
+    """Nueva solicitud MOD_ZRA / MOD_ZSA o edición de un borrador propio."""
+    flujo_mod = _flujo_mod(tipo)
+    if not servicios.puede_capturar(request.user):
+        raise PermissionDenied("Necesitas el rol SOL_MAT o VAL_MAT.")
+    solicitud = None
+    if pk:
+        solicitud = get_object_or_404(Solicitud, pk=pk, flujo=flujo_mod, solicitante=request.user)
+        if solicitud.estado != Solicitud.Estado.BORRADOR:
+            return redirect("solicitudes:detalle", pk=solicitud.pk)
+    centros = request.user.centros.filter(activo=True)
+    editar = lambda s: redirect("solicitudes:editar_mod", tipo=tipo, pk=s.pk)  # noqa: E731
+
+    if request.method == "POST":
+        formset = modificacion.ModificacionFormSet(request.POST, centros=centros, flujo=flujo_mod, solicitud=solicitud)
+        accion = request.POST.get("accion")
+        if accion == "eliminar" or (formset.is_valid() and not formset.renglones and accion not in ("enviar", "validar")):
+            if solicitud is not None:
+                servicios.eliminar_borrador(solicitud)
+                messages.success(request, "Borrador eliminado.")
+            else:
+                messages.info(request, "No había partidas; no se guardó nada.")
+            return redirect("solicitudes:mis_solicitudes")
+        # Igual que AMAT y AMPL: Enter, Guardar borrador y Enviar guardan y luego validan; solo Enviar envía.
+        elif not formset.is_valid():
+            messages.error(request, "Hay valores inválidos; no se guardó nada. Corrige las celdas marcadas.")
+        elif not formset.renglones:
+            messages.error(request, "Agrega al menos una partida antes de enviar.")
+        else:
+            solicitud = modificacion.guardar_borrador(request.user, formset, solicitud)
+            formset.solicitud = solicitud
+            listo = formset.validar_para_envio()
+            if listo and accion == "enviar":
+                solicitud = modificacion.enviar(request.user, formset, solicitud)
+                messages.success(request, f"Solicitud enviada con folio {solicitud.folio}.")
+                return redirect("solicitudes:detalle", pk=solicitud.pk)
+            if listo:
+                messages.success(request, "Borrador guardado. Todo está correcto: ya puedes enviar.")
+                return editar(solicitud)
+            no_envio = "; no se envió" if accion == "enviar" else ""
+            messages.error(request, f"Borrador guardado{no_envio}. Hay celdas por corregir antes de enviar (marcadas en rojo).")
+    else:
+        iniciales = modificacion.filas_iniciales(solicitud) if solicitud else [{"numero": n} for n in range(10, 60, 10)]
+        formset = modificacion.ModificacionFormSet(initial=iniciales, centros=centros, flujo=flujo_mod, solicitud=solicitud)
+
+    return render(request, "solicitudes/capturar_mod.html", {
+        "solicitud": solicitud, "formset": formset, "flujo": flujo_mod, "tipo": tipo,
+        "servicio": modificacion.es_servicio(flujo_mod),
+        "datos_automaticos": _datos_modificacion(centros, flujo_mod), "sin_centros": not centros.exists(),
+    })
+
+
+def _corregir_mod(request, solicitud, editables):
+    """Corregir partidas MOD devueltas o en validación: la misma tabla, con el id de cada partida."""
+    centros = request.user.centros.filter(activo=True)
+    es_solicitante = solicitud.solicitante_id == request.user.pk
+    puede_reenviar = es_solicitante and any(p.estado == Partida.Estado.DEVUELTA_SOL for p in editables)
+    iniciales = [
+        {"pid": p.pk, "numero": p.numero, "codigo_sap": p.modificacion.codigo_sap, "centro": p.centro_id,
+         "campo": p.modificacion.campo, "valor_nuevo": p.modificacion.valor_nuevo}
+        for p in editables
+    ]
+    kwargs = {"centros": centros, "flujo": solicitud.flujo, "solicitud": solicitud}
+    if request.method == "POST":
+        formset = modificacion.ModificacionCorreccionFormSet(request.POST, initial=iniciales, **kwargs)
+        accion = request.POST.get("accion")
+        valido = formset.validar_para_envio() if accion == "reenviar" else formset.is_valid()
+        if valido:
+            devueltas = {p.pk for p in editables if p.estado == Partida.Estado.DEVUELTA_SOL}
+            try:
+                with transaction.atomic():
+                    n = modificacion.guardar_correcciones(request.user, formset.renglones, solicitud)
+                    if accion == "reenviar":
+                        ids = [f.cleaned_data["pid"] for f in formset.renglones if f.cleaned_data["pid"] in devueltas]
+                        flujo.aplicar(request.user, "reenviar", ids)
+            except (PermissionError, flujo.AccionNoPermitida) as e:
+                messages.error(request, str(e))
+                return redirect("solicitudes:detalle", pk=solicitud.pk)
+            if accion == "reenviar":
+                messages.success(request, f"Partidas reenviadas ({n} dato(s) corregido(s)).")
+                return redirect("solicitudes:detalle", pk=solicitud.pk)
+            messages.success(request, f"Correcciones guardadas: {n} dato(s) cambiado(s).")
+            return redirect("solicitudes:corregir", pk=solicitud.pk)
+        messages.error(request, "No se guardó nada. Corrige las celdas marcadas; tus datos siguen en pantalla.")
+    else:
+        formset = modificacion.ModificacionCorreccionFormSet(initial=iniciales, **kwargs)
+    estados = {p.pk: p.get_estado_display() for p in editables}
+    for form in formset:
+        form.estado_partida = estados.get(_entero(form["pid"].value()), "")
+    return render(request, "solicitudes/capturar_mod.html", {
+        "solicitud": solicitud, "formset": formset, "flujo": solicitud.flujo, "tipo": URL_MOD[solicitud.flujo],
+        "servicio": modificacion.es_servicio(solicitud.flujo), "correccion": True, "puede_reenviar": puede_reenviar,
+        "datos_automaticos": _datos_modificacion(centros, solicitud.flujo),
     })
 
 

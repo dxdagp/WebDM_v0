@@ -18,9 +18,9 @@ OPCIONES = [
     ("Mi trabajo", "Mis solicitudes", "solicitudes:mis_solicitudes", {"SOL_MAT", "VAL_MAT"}),
     ("Materiales", "Crear materiales", "solicitudes:nueva_amat", {"SOL_MAT", "VAL_MAT"}),
     ("Materiales", "Ampliar a Centro", "solicitudes:nueva_ampl", {"SOL_MAT", "VAL_MAT"}),
-    ("Materiales", "Modificar materiales", None, {"SOL_MAT", "VAL_MAT"}),
+    ("Materiales", "Modificar materiales", ("solicitudes:nueva_mod", "materiales"), {"SOL_MAT", "VAL_MAT"}),
     ("Servicios", "Crear servicios", None, {"SOL_MAT", "VAL_MAT"}),
-    ("Servicios", "Modificar servicios", None, {"SOL_MAT", "VAL_MAT"}),
+    ("Servicios", "Modificar servicios", ("solicitudes:nueva_mod", "servicios"), {"SOL_MAT", "VAL_MAT"}),
     ("Consulta", "Catálogo de materiales", "catalogo_sap:consulta", {"SOL_MAT", "VAL_MAT", "DM", "ADMIN"}),
     ("Consulta", "Catálogo de servicios", "catalogo_sap:servicios", {"SOL_MAT", "VAL_MAT", "DM", "ADMIN"}),
     ("Administración", "Usuarios, roles y catálogos", "admin:index", {"ADMIN"}),
@@ -39,7 +39,8 @@ def menu(request):
     for grupo, etiqueta, ruta, visibles_para in OPCIONES:
         if not roles & visibles_para:  # & = intersección de conjuntos: ¿comparte algún rol?
             continue
-        url = reverse(ruta) if ruta else None
+        # Una ruta con argumento se escribe como tupla: ("solicitudes:nueva_mod", "materiales").
+        url = (reverse(ruta[0], args=ruta[1:]) if isinstance(ruta, tuple) else reverse(ruta)) if ruta else None
         grupos.setdefault(grupo, []).append({
             "etiqueta": etiqueta,
             "url": url,
@@ -49,7 +50,9 @@ def menu(request):
         })
     # Marca como activa la opción cuya URL coincide más largo con la página actual
     # (así /solicitudes/amat/nueva/ activa "Crear materiales" y no "Mis solicitudes").
-    candidatas = [op for ops in grupos.values() for op in ops if op["url"] and request.path.startswith(op["url"])]
+    # Un borrador (/solicitudes/mod/materiales/7/) también activa su opción (/solicitudes/mod/materiales/nueva/).
+    base = lambda url: url.removesuffix("nueva/")  # noqa: E731
+    candidatas = [op for ops in grupos.values() for op in ops if op["url"] and request.path.startswith(base(op["url"]))]
     if candidatas:
-        max(candidatas, key=lambda op: len(op["url"]))["activa"] = True
+        max(candidatas, key=lambda op: len(base(op["url"])))["activa"] = True
     return {"menu_grupos": grupos, "menu_roles": " · ".join(sorted(roles))}

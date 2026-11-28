@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from catalogos.models import Almacen
 
+from .alcance import de_mis_centros
 from . import duplicados
 from .folios import siguiente_folio
 from .models import DetalleAlta, Evento, Flujo, ImagenPartida, Partida, Solicitud
@@ -181,7 +182,7 @@ def partidas_editables(usuario, solicitud):
         editables = editables | solicitud.partidas.filter(estado=Partida.Estado.DEVUELTA_SOL)
     if "VAL_MAT" in roles:
         editables = editables | solicitud.partidas.filter(
-            estado=Partida.Estado.EN_VALIDACION, centro__in=usuario.centros.values("pk")
+            de_mis_centros(usuario), estado=Partida.Estado.EN_VALIDACION
         )
     return editables.order_by("numero")
 
@@ -200,7 +201,7 @@ def guardar_correcciones(usuario, forms, solicitud):
     """
     # Se vuelven a calcular DENTRO de la transacción y con FOR UPDATE: si mientras el
     # usuario editaba alguien aprobó la partida, ya no es editable y no se toca.
-    permitidas = {p.pk: p for p in partidas_editables(usuario, solicitud).select_for_update()}
+    permitidas = {p.pk: p for p in partidas_editables(usuario, solicitud).select_for_update(of=("self",))}
     cambios = 0
     memo = {}
     for form in forms:

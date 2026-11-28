@@ -1,0 +1,12 @@
+{# Un renglón de la tabla MOD_ZRA / MOD_ZSA: un dato de un material. #}
+<tr class="wd-fila">
+  {% include "solicitudes/_celda.html" with campo=form.numero clase="auto" %}
+  <td class="auto" data-auto="descripcion">{{ form.material.descripcion|default:"—" }}</td>
+  {% include "solicitudes/_celda.html" with campo=form.codigo_sap %}
+  {% if form.centro %}{% include "solicitudes/_celda.html" with campo=form.centro %}{% endif %}
+  {% include "solicitudes/_celda.html" with campo=form.campo %}
+  <td class="auto" data-auto="actual">{{ form.valor_actual|default:"—" }}</td>
+  {% include "solicitudes/_celda.html" with campo=form.valor_nuevo %}
+  <td class="auto">{% if form.pid %}{{ form.pid }}{% endif %}<span class="wd-estado">{{ form.estado_partida|default:"BORRADOR" }}</span></td>
+  {% if not correccion %}<td class="auto"><button type="button" class="btn btn-link btn-sm p-0" data-quitar>Quitar</button></td>{% endif %}
+</tr>

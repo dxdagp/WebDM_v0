@@ -59,7 +59,8 @@ TRANSICIONES = {
     # Solo AMPL_ZRA (sección 10.4): DM retira una partida con motivo, por ejemplo si SAP la rechazó.
     "excluir": Transicion("DM", E.EN_DM, E.EXCLUIDA, Evento.Tipo.EXCLUSION, pide_motivo=True),
 }
-SOLO_AMPLIACION = {"excluir"}
+SOLO_AMPLIACION = {"excluir"}  # y modificaciones: los flujos que DM manda a SAP por TXT
+FLUJOS_CON_TXT = {"AMPL_ZRA", "MOD_ZRA", "MOD_ZSA"}
 
 
 def roles_de(usuario):
@@ -75,6 +76,10 @@ def faltantes(partida):
         from .ampliacion import faltantes as faltantes_ampl
 
         return faltantes_ampl(partida)
+    if partida.solicitud.flujo in ("MOD_ZRA", "MOD_ZSA"):
+        from .modificacion import faltantes as faltantes_mod
+
+        return faltantes_mod(partida)
     alta = partida.alta
     vacios = []
     for campo in CAMPOS_OBLIGATORIOS_ENVIO:
@@ -116,8 +121,10 @@ def _verificar_alcance(usuario, partidas, t):
         if ajenas:
             raise AccionNoPermitida("Solo puedes mover partidas de tus propias solicitudes.")
     else:
-        centros = set(usuario.centros.values_list("pk", flat=True))
-        fuera = [p for p in partidas if p.centro_id not in centros]
+        from .alcance import de_mis_centros
+
+        mias = set(Partida.objects.filter(de_mis_centros(usuario), pk__in=[p.pk for p in partidas]).values_list("pk", flat=True))
+        fuera = [p for p in partidas if p.pk not in mias]
         if fuera:
             raise AccionNoPermitida("Alguna partida es de un Centro que no tienes autorizado.")
 
@@ -168,8 +175,8 @@ def aplicar(usuario, accion, ids, motivo=""):
     if len(partidas) != len(ids):
         raise AccionNoPermitida("Alguna partida ya no existe. Recarga la página.")
     _verificar_alcance(usuario, partidas, t)
-    if accion in SOLO_AMPLIACION and any(p.solicitud.flujo != "AMPL_ZRA" for p in partidas):
-        raise AccionNoPermitida("Solo las partidas de ampliación (AMPL_ZRA) se pueden excluir.")
+    if accion in SOLO_AMPLIACION and any(p.solicitud.flujo not in FLUJOS_CON_TXT for p in partidas):
+        raise AccionNoPermitida("Solo las ampliaciones y modificaciones se pueden excluir.")
 
     movidas = [p for p in partidas if p.estado != t.desde]
     if movidas:

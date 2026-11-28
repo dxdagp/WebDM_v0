@@ -219,7 +219,7 @@ El botón de las altas AMAT cambió de nombre a **Terminar altas con el código 
 
 Si entre lo marcado hay algo que no es una ampliación en Datos Maestros (por ejemplo, un alta AMAT), no se hace nada y el mensaje dice qué quitar: todas o ninguna.
 
-El código está en `ampliacion.seleccion_dm()` y en las vistas `exportar_ampl` y `finalizar_ampl`. La consulta que arma el TXT es una sola, para todos los folios:
+Desde la fase 4d el código está en `solicitudes/lotes.py` (que también atiende las modificaciones) y en las vistas `exportar_dm` y `finalizar_dm`. Los botones ahora dicen **Exportar TXT** y **Finalizar seleccionadas**. La consulta que arma el TXT es una sola, para todos los folios:
 
 ```sql
 SELECT ... FROM solicitudes_partida p

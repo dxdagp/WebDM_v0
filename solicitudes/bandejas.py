@@ -7,6 +7,7 @@ todavía no se ejecuta. Así la misma función sirve para listar las partidas
 
 from django.db.models import OuterRef, Subquery
 
+from . import alcance
 from .flujo import roles_de
 from .models import Evento, Partida
 
@@ -26,9 +27,8 @@ def partidas_de(usuario, clave):
         # Lo que me devolvieron a mí, sin importar el Centro.
         return Partida.objects.filter(solicitud__solicitante=usuario, estado=E.DEVUELTA_SOL)
     estado = {"val": E.EN_VALIDACION, "dm": E.EN_DM}[clave]
-    # Solo mis Centros autorizados. `centro__in=<subconsulta>` se convierte en
-    # WHERE centro_id IN (SELECT centro_id FROM usuarios_usuario_centros WHERE usuario_id = …).
-    return Partida.objects.filter(estado=estado, centro__in=usuario.centros.values("pk"))
+    # Solo mis Centros autorizados (ver alcance.py: las modificaciones generales no tienen Centro).
+    return Partida.objects.filter(alcance.de_mis_centros(usuario), estado=estado)
 
 
 def pestanas_de(usuario):
@@ -49,7 +49,8 @@ def con_datos_de_tabla(queryset):
     )
     return (
         queryset.select_related("solicitud__solicitante", "centro", "alta__grupo_articulos", "alta__umb",
-                                 "ampliacion__material", "ampliacion__centro_origen")
+                                 "ampliacion__material", "ampliacion__centro_origen",
+                                 "modificacion__material")
         # Subquery = un SELECT dentro del SELECT: para cada partida trae el motivo de su devolución más reciente.
         .annotate(ultimo_motivo=Subquery(ultimo_motivo))
         .order_by("actualizada")

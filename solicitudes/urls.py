@@ -12,6 +12,9 @@ urlpatterns = [
     path("ampl/nueva/", views.capturar_ampl, name="nueva_ampl"),
     path("ampl/<int:pk>/", views.capturar_ampl, name="editar_ampl"),
     path("ampl/material/", views.material_ampl, name="material_ampl"),
+    path("mod/<str:tipo>/nueva/", views.capturar_mod, name="nueva_mod"),
+    path("mod/<str:tipo>/<int:pk>/", views.capturar_mod, name="editar_mod"),
+    path("mod/material/", views.material_mod, name="material_mod"),
     path("<int:pk>/ampliacion-dm/", views.ampliacion_dm, name="ampliacion_dm"),
     path("<int:pk>/", views.detalle, name="detalle"),
     # Fase 3
@@ -19,8 +22,8 @@ urlpatterns = [
     path("pendientes/", views.pendientes, name="pendientes"),
     path("pendientes/accion/", views.accion_en_bloque, name="accion"),
     path("pendientes/terminar/", views.terminar_dm, name="terminar_dm"),
-    path("pendientes/exportar-ampl/", views.exportar_ampl, name="exportar_ampl"),
-    path("pendientes/finalizar-ampl/", views.finalizar_ampl, name="finalizar_ampl"),
+    path("pendientes/exportar/", views.exportar_dm, name="exportar_dm"),
+    path("pendientes/finalizar/", views.finalizar_dm, name="finalizar_dm"),
     path("partida/<int:pk>/", views.partida, name="partida"),
     path("partida/<int:pk>/corregir-codigo/", views.corregir_codigo, name="corregir_codigo"),
     # Fase 4

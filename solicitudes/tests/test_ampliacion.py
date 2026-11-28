@@ -144,7 +144,7 @@ class FlujoDMTests(Base):
         self.client.force_login(self.dm)
         r = self.client.get(reverse("solicitudes:pendientes"), {"tab": "dm"})
         self.assertContains(r, "Ampliar 310001 · BALATA")
-        self.assertContains(r, reverse("solicitudes:exportar_ampl"))  # un solo botón arriba, no uno por partida
+        self.assertContains(r, reverse("solicitudes:exportar_dm"))  # un solo botón arriba, no uno por partida
         self.assertNotContains(r, reverse("solicitudes:ampliacion_dm", args=[s.pk]))
         r = self.client.get(reverse("solicitudes:detalle", args=[s.pk]))
         self.assertContains(r, "Datos Maestros: exportar / finalizar")
@@ -164,12 +164,12 @@ class BandejaDMTests(Base):
         self.client.force_login(self.dm)
 
     def test_exporta_un_solo_txt_de_varios_folios(self):
-        r = self.client.post(reverse("solicitudes:exportar_ampl"), {"partidas": self.ids})
+        r = self.client.post(reverse("solicitudes:exportar_dm"), {"partidas": self.ids})
         self.assertEqual(r["Content-Disposition"], 'attachment; filename="Amp_Mat.txt"')
         lineas = [l.split("\t")[0] for l in r.content.decode().split("\r\n") if l]
         self.assertEqual(lineas, ["310001", "310002"])
         # Solo lo marcado:
-        r = self.client.post(reverse("solicitudes:exportar_ampl"), {"partidas": self.ids[1:]})
+        r = self.client.post(reverse("solicitudes:exportar_dm"), {"partidas": self.ids[1:]})
         self.assertEqual(r.content.decode().count("\r\n"), 1)
         self.assertFalse(Partida.objects.exclude(estado=E.EN_DM).filter(pk__in=self.ids).exists())  # exportar no cambia nada
 
@@ -177,18 +177,18 @@ class BandejaDMTests(Base):
         self.post(self.sol, "enviar", self.renglon(10))
         en_validacion = Partida.objects.get(estado=E.EN_VALIDACION).pk
         self.client.force_login(self.dm)
-        r = self.client.post(reverse("solicitudes:exportar_ampl"), {"partidas": self.ids + [en_validacion], "tab": "dm"}, follow=True)
+        r = self.client.post(reverse("solicitudes:exportar_dm"), {"partidas": self.ids + [en_validacion], "tab": "dm"}, follow=True)
         self.assertContains(r, "Quita de la selección")
-        r = self.client.post(reverse("solicitudes:exportar_ampl"), {"tab": "dm"}, follow=True)
-        self.assertContains(r, "Selecciona al menos una ampliación")
+        r = self.client.post(reverse("solicitudes:exportar_dm"), {"tab": "dm"}, follow=True)
+        self.assertContains(r, "Selecciona al menos una partida")
 
     def test_excluir_y_finalizar_lo_seleccionado(self):
         excluida, terminada = self.ids
         r = self.client.post(reverse("solicitudes:accion"), {"accion": "excluir", "partidas": [excluida],
                                                              f"motivo-{excluida}": "SAP lo rechazó", "tab": "dm"}, follow=True)
         self.assertContains(r, "excluida(s)")
-        r = self.client.post(reverse("solicitudes:finalizar_ampl"), {"partidas": [terminada], "tab": "dm"}, follow=True)
-        self.assertContains(r, "1 ampliación(es) terminada(s)")
+        r = self.client.post(reverse("solicitudes:finalizar_dm"), {"partidas": [terminada], "tab": "dm"}, follow=True)
+        self.assertContains(r, "1 partida(s) terminada(s)")
         self.assertEqual(Partida.objects.get(pk=excluida).estado, E.EXCLUIDA)
         self.assertEqual(Partida.objects.get(pk=terminada).estado, E.TERMINADA)
         self.assertTrue(MaterialCentro.objects.filter(material__codigo="310002", centro=self.c["meix"]).exists())
