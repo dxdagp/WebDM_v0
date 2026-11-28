@@ -20,7 +20,8 @@ class SoloLecturaMixin:
         """Todo de solo lectura. Así los campos que Django llena solo (auto_now_add, como
         ImagenPartida.subida o Evento.fecha) se pueden listar en `fields` sin el error
         "'subida' cannot be specified ... non-editable field"."""
-        return self.fields or [f.name for f in self.model._meta.fields]
+        # Sin la llave primaria: el ID interno no le dice nada a ADMIN (pedido de Dave, 28-nov-2026).
+        return self.fields or [f.name for f in self.model._meta.fields if not f.primary_key]
 
 
 class PartidaInline(SoloLecturaMixin, admin.TabularInline):
@@ -62,6 +63,20 @@ class DetalleServicioInline(DetalleInline):
     model = models.DetalleServicio
 
 
+class BitacoraPartidaInline(SoloLecturaMixin, admin.TabularInline):
+    """La bitácora de UNA partida en su ficha, de la más antigua a la más reciente."""
+
+    model = models.Evento
+    fields = ("fecha", "tipo", "quien", "estado_anterior", "estado_nuevo", "motivo", "detalle")
+    ordering = ("fecha", "id")
+    verbose_name_plural = "bitácora de la partida"
+    extra = 0
+
+    @admin.display(description="usuario")
+    def quien(self, evento):
+        return evento.usuario or "Sistema"  # usuario vacío = lo hizo WebDM (por ejemplo, el job de vencimientos)
+
+
 class ImagenInline(SoloLecturaMixin, admin.TabularInline):
     model = models.ImagenPartida
     fields = ("orden", "archivo", "subida", "subida_por")
@@ -82,7 +97,7 @@ class PartidaAdmin(SoloLecturaMixin, admin.ModelAdmin):
             models.Flujo.MOD_ZSA: [DetalleModificacionInline],
             models.Flujo.ASER_ZSA: [DetalleServicioInline],
         }
-        return por_flujo.get(obj.solicitud.flujo, []) if obj else []
+        return por_flujo.get(obj.solicitud.flujo, []) + [BitacoraPartidaInline] if obj else []
 
 
 @admin.register(models.ContadorFolio)
