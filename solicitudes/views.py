@@ -90,6 +90,8 @@ def capturar_amat(request, pk=None):
             else:
                 messages.info(request, "No había partidas; no se guardó nada.")
             return redirect("solicitudes:mis_solicitudes")
+        if accion == "guardar":
+            accion = "validar"  # pedido de Dave: Guardar borrador también valida, igual que Enter
         if accion in ("enviar", "validar") and formset.is_valid() and not formset.renglones:
             messages.error(request, "Agrega al menos una partida antes de enviar.")
         elif not formset.is_valid():
@@ -108,9 +110,6 @@ def capturar_amat(request, pk=None):
             except flujo.AccionNoPermitida as e:
                 messages.error(request, f"No se guardó nada: {e} Vuelve a elegir las imágenes.")
             else:
-                if accion not in ("enviar", "validar"):
-                    messages.success(request, "Borrador guardado.")
-                    return redirect("solicitudes:editar_amat", pk=solicitud.pk)
                 listo = formset.validar_para_envio()
                 if listo:
                     # Fase 4: imágenes (mínimo 1) y duplicados contra el Catálogo SAP.
@@ -118,12 +117,12 @@ def capturar_amat(request, pk=None):
                     for aviso in avisos:
                         messages.warning(request, aviso)
                 if accion == "validar":
-                    # Pedido de Dave: Enter (o el botón Validar) revisa todo como si fuera a enviar,
-                    # pero NO envía. Se guarda como borrador para no perder lo capturado ni las imágenes.
+                    # Pedido de Dave: Enter y Guardar borrador revisan todo como si fuera a enviar,
+                    # pero NO envían. Se guarda como borrador para no perder lo capturado ni las imágenes.
                     if listo:
-                        messages.success(request, "Validación correcta: la solicitud está lista para enviar. Se guardó como borrador.")
+                        messages.success(request, "Borrador guardado. Todo está correcto: ya puedes enviar.")
                         return redirect("solicitudes:editar_amat", pk=solicitud.pk)
-                    messages.error(request, "La validación encontró errores (marcados en rojo). Se guardó como borrador; no se envió.")
+                    messages.error(request, "Borrador guardado, pero hay celdas por corregir antes de enviar (marcadas en rojo).")
                 elif listo:
                     solicitud = servicios.enviar(request.user, formset, solicitud)
                     messages.success(request, f"Solicitud enviada con folio {solicitud.folio}.")
@@ -727,37 +726,24 @@ def capturar_ampl(request, pk=None):
             else:
                 messages.info(request, "No había partidas; no se guardó nada.")
             return redirect("solicitudes:mis_solicitudes")
-        if accion == "validar":
-            # Pedido de Dave: Enter (o el botón Validar) revisa todo como al enviar, pero no envía.
-            if formset.is_valid() and formset.renglones:
-                solicitud = ampliacion.guardar_borrador(request.user, formset, solicitud)
-            if formset.validar_para_envio():
-                for f in formset.renglones:
-                    if ampliacion.ya_ampliado(f.material, f.cleaned_data["centro"], f.compartido):
-                        messages.warning(request, f"Partida {f.cleaned_data['numero']}: el material ya existe en "
-                                                  f"{f.cleaned_data['centro'].codigo}; se omitirá al enviar.")
-                messages.success(request, "Validación correcta: la solicitud está lista para enviar. Se guardó como borrador.")
-                return redirect("solicitudes:editar_ampl", pk=solicitud.pk)
-            guardado = " Se guardó como borrador." if solicitud else ""
-            messages.error(request, f"La validación encontró errores (marcados en rojo); no se envió.{guardado}")
-        elif accion == "enviar":
-            if formset.validar_para_envio():
-                solicitud, omitidas = ampliacion.enviar(request.user, formset, solicitud)
-                for d in omitidas:
-                    messages.warning(request, f"Partida {d['numero']}: el material {d['codigo_sap']} ya existe en "
-                                              f"{d['centro'].codigo}; se omitió.")
-                if solicitud.folio:
-                    messages.success(request, f"Solicitud enviada con folio {solicitud.folio}.")
-                    return redirect("solicitudes:detalle", pk=solicitud.pk)
-                messages.error(request, "No existen partidas válidas: todos los materiales ya existen en su Centro nuevo.")
-                return redirect("solicitudes:editar_ampl", pk=solicitud.pk)
-            messages.error(request, "No se pudo enviar. Corrige las celdas marcadas.")
-        elif formset.is_valid():
-            solicitud = ampliacion.guardar_borrador(request.user, formset, solicitud)
-            messages.success(request, "Borrador guardado.")
-            return redirect("solicitudes:editar_ampl", pk=solicitud.pk)
-        else:
+        # Pedido de Dave: Enter, Guardar borrador y Enviar validan todo igual. Primero se guarda el
+        # borrador (para no perder nada) y luego se revisa como si fuera a enviar; solo Enviar envía.
+        elif not formset.is_valid():
             messages.error(request, "Hay valores inválidos; no se guardó nada. Corrige las celdas marcadas.")
+        elif not formset.renglones:
+            messages.error(request, "Agrega al menos una partida antes de enviar.")
+        else:
+            solicitud = ampliacion.guardar_borrador(request.user, formset, solicitud)
+            listo = formset.validar_para_envio()
+            if listo and accion == "enviar":
+                solicitud = ampliacion.enviar(request.user, formset, solicitud)
+                messages.success(request, f"Solicitud enviada con folio {solicitud.folio}.")
+                return redirect("solicitudes:detalle", pk=solicitud.pk)
+            if listo:
+                messages.success(request, "Borrador guardado. Todo está correcto: ya puedes enviar.")
+                return redirect("solicitudes:editar_ampl", pk=solicitud.pk)
+            no_envio = "; no se envió" if accion == "enviar" else ""
+            messages.error(request, f"Borrador guardado{no_envio}. Hay celdas por corregir antes de enviar (marcadas en rojo).")
     else:
         iniciales = ampliacion.filas_iniciales(solicitud) if solicitud else [{"numero": n} for n in range(10, 60, 10)]
         formset = ampliacion.AmpliacionFormSet(initial=iniciales, centros=centros)

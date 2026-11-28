@@ -27,7 +27,6 @@
         {% if puede_reenviar %}<button type="submit" name="accion" value="reenviar" class="btn btn-primary fw-semibold">Guardar y reenviar</button>{% endif %}
       {% else %}
         {% if solicitud %}<button type="submit" name="accion" value="eliminar" class="btn btn-outline-danger" formnovalidate onclick="return confirm('¿Eliminar este borrador con todas sus partidas? No se puede deshacer.');">Eliminar borrador</button>{% endif %}
-        <button type="submit" name="accion" value="validar" class="btn btn-outline-primary" title="Revisa todo como al enviar, sin enviar (también con Enter)">Validar</button>
         <button type="submit" name="accion" value="guardar" class="btn btn-outline-secondary">Guardar borrador</button>
         <button type="submit" name="accion" value="enviar" class="btn btn-primary fw-semibold">Enviar</button>
       {% endif %}

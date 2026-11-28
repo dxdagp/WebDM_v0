@@ -64,12 +64,13 @@ class CapturaTests(Base):
         r = self.post(self.sol, "guardar", self.renglon(almacen_destino=mttu_alm.pk))
         self.assertContains(r, "No pertenece al Centro MEIX")
 
-    def test_ya_ampliado_se_omite_y_si_todos_queda_borrador(self):
-        r = self.post(self.sol, "enviar", self.renglon(centro=self.c["mttu"]))
-        self.assertContains(r, "ya existe en MTTU; se omitió")
-        self.assertContains(r, "No existen partidas válidas")
-        s = Solicitud.objects.get()
-        self.assertEqual((s.estado, s.folio, s.partidas.count()), ("BORRADOR", None, 0))
+    def test_ya_ampliado_es_error_en_centro_nuevo(self):
+        # Pedido de Dave: no se omite en silencio; se marca la celda Centro nuevo y no se envía.
+        for accion in ("guardar", "validar", "enviar"):
+            r = self.post(self.sol, accion, self.renglon(centro=self.c["mttu"]))
+            self.assertContains(r, "El material ya existe en MTTU.")
+        for s in Solicitud.objects.all():  # cada intento quedó como borrador con su partida, sin folio
+            self.assertEqual((s.estado, s.folio, s.partidas.count()), ("BORRADOR", None, 1))
         self.assertFalse(Evento.objects.filter(tipo=Evento.Tipo.ENVIO).exists())
 
     def test_repetido_en_la_misma_solicitud(self):
@@ -226,14 +227,20 @@ class EnterValidaTests(Base):
     """Pedido de Dave: Enter no envía; valida lo capturado (y lo guarda como borrador)."""
 
     def test_validar_no_envia(self):
-        r = self.post(self.sol, "validar", self.renglon())
-        self.assertContains(r, "Validación correcta")
-        s = Solicitud.objects.get()
-        self.assertEqual((s.estado, s.folio), ("BORRADOR", None))
+        for accion in ("validar", "guardar"):  # Enter y Guardar borrador validan igual
+            r = self.post(self.sol, accion, self.renglon())
+            self.assertContains(r, "Todo está correcto: ya puedes enviar")
+        self.assertEqual(set(Solicitud.objects.values_list("estado", "folio")), {("BORRADOR", None)})
+
+    def test_sin_boton_validar_visible(self):
+        self.client.force_login(self.sol)
+        for url in (reverse("solicitudes:nueva_ampl"), reverse("solicitudes:nueva_amat")):
+            html = self.client.get(url).content.decode()
+            self.assertEqual(html.count('value="validar"'), 1)  # solo el oculto que usa Enter
 
     def test_validar_marca_errores(self):
         r = self.post(self.sol, "validar", self.renglon(codigo="999999"))
-        self.assertContains(r, "La validación encontró errores")
+        self.assertContains(r, "Hay valores inválidos")
         self.assertContains(r, "No existe en el catálogo de materiales")
         self.assertFalse(Solicitud.objects.exists())
 

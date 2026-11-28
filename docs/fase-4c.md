@@ -6,7 +6,7 @@ Revisión 3, sección 10, con el layout que definió Dave el 28-nov-2026:
 | --- | --- |
 | Captura | Material, Centro nuevo, Almacén nuevo, Centro modelo, Almacén modelo. WebDM propone el Centro y el Almacén modelo; también el Planificador y el Grupo de compras del Centro nuevo. El CeBe es automático. |
 | TXT para SAP | Siempre se llama **`Amp_Mat.txt`**, sin encabezados, separado por tabuladores, con 9 columnas (ver la sección 4). |
-| Renglón ya ampliado | Si el material ya existe en el Centro nuevo, se quita al enviar con un aviso. Si no queda ninguno: "No existen partidas válidas" y sigue en borrador. |
+| Renglón ya ampliado | Si el material ya existe en el Centro nuevo, la celda **Centro nuevo** sale en rojo: "El material ya existe en MTTU." No se puede enviar hasta corregirla o quitar el renglón. |
 | Validación | Igual que AMAT: VAL_MAT aprueba, devuelve o cancela varias a la vez; si la crea un validador, pasa directo a DM. |
 | DM | Exporta las veces que quiera, excluye con motivo, y al **Finalizar** las partidas pasan a TERMINADA y su Centro nuevo se agrega al **catálogo de materiales** (es una nueva ubicación del mismo material). |
 
@@ -29,7 +29,7 @@ python manage.py runserver
 4. Entra como `dm`. En **Pendientes → Datos Maestros** la partida dice "Ampliar 310001 · …" y tiene el botón **Exportar / finalizar**.
 5. **Exportar Amp_Mat.txt**, ábrelo con el Bloc de notas: un renglón, 9 columnas.
 6. **Finalizar.** Abre **Consulta → Catálogo de materiales**: el material ya sale en MTTU y en MEIX.
-7. Prueba también enviar el mismo material a MTTU: sale "ya existe en MTTU; se omitió".
+7. Prueba también enviar el mismo material a MTTU: la celda Centro nuevo sale en rojo con "El material ya existe en MTTU." y no se envía.
 
 ## 2. Dónde se guarda
 
@@ -58,7 +58,8 @@ ALTER TABLE "solicitudes_detalleampliacion" ALTER COLUMN "codigo_sap" DROP DEFAU
   - cada almacén, planificador y grupo de compras sea de **su** Centro (el almacén modelo, del Centro modelo; los demás, del Centro nuevo);
   - el Centro nuevo y el modelo no sean el mismo.
 - **`completar()`**: llena con la propuesta lo que quedó vacío. Se usa al guardar **y** antes de exigir obligatorios: lo que WebDM propone no se le exige al usuario.
-- **`enviar()`**: separa los renglones ya ampliados (`ya_ampliado()`), guarda el resto, asigna folio `AMPL_ZRA-2026-…` y los mete al flujo.
+- **`validar_para_envio()`**: marca en Centro nuevo los renglones ya ampliados (`ya_ampliado()`).
+- **`enviar()`**: guarda, asigna folio `AMPL_ZRA-2026-…` y los mete al flujo.
 - **`faltantes()`**: lo que usa `flujo.aplicar` al **Aprobar** y **Reenviar**. Además de los obligatorios, vuelve a revisar si el material ya se amplió mientras la partida esperaba (por ejemplo, porque alguien importó el TXT de SAP).
 - **`texto_txt()`** y **`finalizar()`**: lo de Datos Maestros.
 
@@ -140,7 +141,7 @@ SELECT fecha, tipo, motivo FROM solicitudes_evento WHERE tipo = 'EXCLUSION' ORDE
 - Las propuestas: Centro modelo, almacenes, planificador y grupo de compras.
 - Un material que no existe, y un Centro modelo donde el material no está.
 - Un almacén de otro Centro.
-- Un renglón ya ampliado se omite y, si son todos, la solicitud queda en borrador sin folio ni historia.
+- Un renglón ya ampliado marca error en Centro nuevo al guardar, con Enter y al enviar; no se envía.
 - Material y Centro nuevo repetidos en la misma solicitud.
 - El validador manda directo a DM.
 - El JSON del material.
@@ -152,9 +153,19 @@ SELECT fecha, tipo, motivo FROM solicitudes_evento WHERE tipo = 'EXCLUSION' ORDE
 
 - Enter (Validar) revisa sin enviar, en AMAT y en AMPL.
 
-En total pasan 155 pruebas (incluye `test_volumen.py`: 1,200 partidas en AMAT y en AMPL, y 2,001 que deben marcar error).
+En total pasan 156 pruebas (incluye `test_volumen.py`: 1,200 partidas en AMAT y en AMPL, y 2,001 que deben marcar error).
 
-## 8. Enter valida, no envía (AMAT y AMPL)
+## 8. Enter y Guardar borrador validan; nadie envía sin querer (AMAT y AMPL)
+
+Segundo pedido de Dave: **ya no hay botón Validar**. Se valida solo con **Enter**, al **Guardar borrador** y al **Enviar**. Los tres guardan primero el borrador y luego revisan todo como si fueran a enviar. Solo Enviar asigna folio. En el código, `accion == "guardar"` se trata igual que `"validar"`.
+
+Mensajes:
+
+- Todo bien: "Borrador guardado. Todo está correcto: ya puedes enviar."
+- Con errores: "Borrador guardado, pero hay celdas por corregir antes de enviar (marcadas en rojo)."
+- Un valor que no existe en los catálogos (por ejemplo, un material que no está): "Hay valores inválidos; no se guardó nada." Ese no se puede guardar, porque la base no acepta una llave a un catálogo que no existe.
+
+Lo que sigue es cómo quedó la primera versión de este pedido. El botón visible ya se quitó; el oculto sigue.
 
 Pedido de Dave: en una tabla de captura, **Enter** ya no envía la solicitud. Ahora valida.
 

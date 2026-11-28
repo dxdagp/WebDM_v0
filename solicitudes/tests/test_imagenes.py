@@ -173,7 +173,7 @@ class ValidarAmatTests(TestCase):
         datos = {"form-TOTAL_FORMS": "1", "form-INITIAL_FORMS": "0", "accion": "validar",
                  "form-0-numero": "10", "form-0-centro": c["mttu"].pk, "form-0-descripcion": "FILTRO"}
         r = self.client.post(reverse("solicitudes:nueva_amat"), datos, follow=True)
-        self.assertContains(r, "La validación encontró errores")
+        self.assertContains(r, "hay celdas por corregir antes de enviar")
         s = Solicitud.objects.get()
         self.assertEqual((s.estado, s.folio), ("BORRADOR", None))
         # Sin partidas, validar no crea nada.

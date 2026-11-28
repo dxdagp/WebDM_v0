@@ -213,8 +213,12 @@ class BaseAmpliacionFormSet(FormsetCompartido, forms.BaseFormSet):
             return False
         ok = True
         for form in self.renglones:
-            if ya_ampliado(form.material, form.cleaned_data.get("centro"), self.compartido):
-                continue  # se omitirá al enviar (sección 10.3); no tiene caso exigirle datos
+            centro = form.cleaned_data.get("centro")
+            if ya_ampliado(form.material, centro, self.compartido):
+                # Pedido de Dave: es un error en la celda Centro nuevo, no un renglón que se omite.
+                form.add_error("centro", f"El material ya existe en {centro.codigo}.")
+                ok = False
+                continue
             for campo in form.faltantes():
                 form.add_error(campo, "Obligatorio para enviar.")
                 ok = False
@@ -331,20 +335,10 @@ def ya_ampliado(material, centro, c=None):
 def enviar(usuario, formset, solicitud=None):
     """Primer envío (sección 10.3).
 
-    Un renglón cuyo material YA existe en el Centro nuevo es innecesario: se quita con un aviso
-    y no entra al flujo (no crea partida ni historia). Si no queda ninguno, la solicitud sigue
-    en BORRADOR. Devuelve (solicitud, omitidas); solicitud.folio es None si no se envió.
+    Se llama solo si validar_para_envio() pasó: ningún material existe ya en su Centro nuevo
+    (eso se marca como error en la celda Centro nuevo).
     """
-    omitidas = [f.cleaned_data for f in formset.renglones if ya_ampliado(f.material, f.cleaned_data["centro"], f.compartido)]
-    numeros_omitidos = {d["numero"] for d in omitidas}
-    formset_valido = [f for f in formset.renglones if f.cleaned_data["numero"] not in numeros_omitidos]
-
-    class _Solo:  # el mismo formset, pero solo con los renglones que sí entran
-        renglones = formset_valido
-
-    solicitud = guardar_borrador(usuario, _Solo, solicitud)
-    if not formset_valido:
-        return solicitud, omitidas
+    solicitud = guardar_borrador(usuario, formset, solicitud)
 
     directo_a_dm = usuario.groups.filter(name="VAL_MAT").exists()
     estado_nuevo = E.EN_DM if directo_a_dm else E.EN_VALIDACION
@@ -359,7 +353,7 @@ def enviar(usuario, formset, solicitud=None):
             solicitud=solicitud, partida=partida, usuario=usuario, tipo=Evento.Tipo.ENVIO,
             estado_anterior=E.BORRADOR, estado_nuevo=estado_nuevo,
         )
-    return solicitud, omitidas
+    return solicitud
 
 
 def faltantes(partida):
