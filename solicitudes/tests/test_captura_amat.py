@@ -247,3 +247,16 @@ class AlmacenEditableTests(BaseCaptura):
         Solicitud.objects.all().delete()
         self.post("guardar", self.fila())
         self.assertEqual(Partida.objects.get().alta.almacen.codigo, "AA01")  # sin predeterminado: el primero
+
+
+class RenglonesInicialesTests(BaseCaptura):
+    def test_cinco_renglones_vacios_y_no_cuentan(self):
+        r = self.client.get(reverse("solicitudes:nueva_amat"))
+        self.assertEqual(len(r.context["formset"].forms), 5)
+        # Se llena solo el primero y se mandan los 5: se guarda UNA partida.
+        vacio = {"descripcion": "", "centro": "", "ubicacion": "", "no_parte_original": "", "tipo_unidad": "",
+                 "marca": "", "version": "", "anio_modelo": "", "umb": "", "grupo_articulos": "",
+                 "categoria_valoracion": "", "grupo_compras": ""}
+        filas = [self.fila()] + [self.fila(i, numero=10 * (i + 1), **vacio) for i in range(1, 5)]
+        self.post("guardar", *filas)
+        self.assertEqual(Partida.objects.count(), 1)

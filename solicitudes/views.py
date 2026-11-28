@@ -122,7 +122,7 @@ def capturar_amat(request, pk=None):
                     return redirect("solicitudes:detalle", pk=solicitud.pk)
                 messages.error(request, "No se pudo enviar; quedó guardada como borrador (con sus imágenes). Corrige las celdas marcadas.")
     else:
-        iniciales = _filas_iniciales(solicitud) if solicitud else [{"numero": n} for n in (10, 20, 30)]
+        iniciales = _filas_iniciales(solicitud) if solicitud else [{"numero": n} for n in range(10, 60, 10)]  # 5 renglones vacíos (10 a 50); los vacíos se ignoran al guardar
         formset = PartidasFormSet(initial=iniciales, centros=centros)
 
     _marcar_guardadas(formset, solicitud, "numero")
